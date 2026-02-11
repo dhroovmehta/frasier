@@ -22,6 +22,7 @@ const events = require('./lib/events');
 const models = require('./lib/models');
 const memory = require('./lib/memory');
 const policy = require('./lib/policy');
+const notion = require('./lib/notion');
 
 // ============================================================
 // DISCORD CLIENT SETUP
@@ -348,12 +349,21 @@ async function announceCompletedSteps() {
     const agent = await agents.getAgent(step.assigned_agent_id);
     const agentName = agent?.display_name || step.assigned_agent_id;
 
-    // Brief alert only — full deliverable goes to Notion/Google Drive
-    const announcement = `**Deliverable Ready** — ${step.missions.title}\nAgent: ${agentName} | Approved by Team Lead\nFull report published to Notion.`;
+    // Publish full deliverable to Notion
+    const notionPage = await notion.publishDeliverable({
+      title: step.missions.title,
+      content: step.result || '',
+      teamId: step.missions.team_id,
+      agentName,
+      missionId: step.mission_id,
+      stepId: step.id
+    });
+
+    // Brief alert in Discord — link to Notion if available
+    const notionLink = notionPage?.url ? `\n[View in Notion](${notionPage.url})` : '';
+    const announcement = `**Deliverable Ready** — ${step.missions.title}\nAgent: ${agentName} | Approved by Team Lead${notionLink}`;
 
     await sendSplit(channel, announcement);
-
-    // TODO: publish full result to Notion/Google Drive here
 
     // Mark as announced
     await supabase
