@@ -2,9 +2,10 @@
 // WHY: This is the "hands" of the system. It picks up pending mission steps,
 // constructs the agent's full prompt (identity + memory + task), calls the LLM,
 // saves the result, and triggers the approval chain.
+// It also processes pending reviews (QA → Team Lead approval chain).
 //
-// Polling loop: every 10 seconds, check for pending steps.
-// One step at a time to stay within 1GB RAM.
+// Polling loop: every 10 seconds, check for pending steps OR pending reviews.
+// One at a time to stay within 1GB RAM.
 
 require('dotenv').config();
 const memory = require('./lib/memory');
@@ -12,6 +13,7 @@ const models = require('./lib/models');
 const missions = require('./lib/missions');
 const conversations = require('./lib/conversations');
 const events = require('./lib/events');
+const supabase = require('./lib/supabase');
 
 const POLL_INTERVAL_MS = 10 * 1000; // 10 seconds
 let running = true;
@@ -31,6 +33,7 @@ async function main() {
   while (running) {
     try {
       await processNextStep();
+      await processNextReview();
     } catch (err) {
       console.error('[worker] Unexpected error in main loop:', err.message);
       await events.logEvent({
@@ -45,17 +48,14 @@ async function main() {
 }
 
 // ============================================================
-// STEP PROCESSING
+// STEP PROCESSING (agent does the work)
 // ============================================================
 
 async function processNextStep() {
-  // Get one pending step
   const pendingSteps = await missions.getPendingSteps(1);
-  if (pendingSteps.length === 0) return; // Nothing to do
+  if (pendingSteps.length === 0) return;
 
   const step = pendingSteps[0];
-
-  // Claim the step (prevents double-processing)
   const claimed = await missions.claimStep(step.id);
   if (!claimed) {
     console.log(`[worker] Step #${step.id} already claimed, skipping`);
@@ -66,7 +66,6 @@ async function processNextStep() {
   console.log(`[worker]   Agent: ${step.assigned_agent_id}, Tier: ${step.model_tier}`);
 
   try {
-    // Build the agent's full prompt (identity + memory)
     const topicTags = extractTopicTags(step.description);
     const promptData = await memory.buildAgentPrompt(step.assigned_agent_id, topicTags);
 
@@ -86,7 +85,6 @@ async function processNextStep() {
     });
 
     if (result.error) {
-      // Handle Manus credits exhausted — needs Tier 3 approval
       if (result.error === 'MANUS_CREDITS_EXHAUSTED') {
         await events.logEvent({
           eventType: 'tier3_escalation_needed',
@@ -149,13 +147,133 @@ async function processNextStep() {
 }
 
 // ============================================================
+// REVIEW PROCESSING (QA / Team Lead evaluates the work)
+// ============================================================
+
+async function processNextReview() {
+  // Find one pending approval
+  const { data: pendingApprovals, error } = await supabase
+    .from('approval_chain')
+    .select('*, mission_steps!inner(id, description, result, assigned_agent_id, mission_id)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (error || !pendingApprovals || pendingApprovals.length === 0) return;
+
+  const approval = pendingApprovals[0];
+  const step = approval.mission_steps;
+
+  console.log(`[worker] Processing review #${approval.id} by ${approval.reviewer_agent_id} (${approval.review_type})`);
+
+  try {
+    // Build reviewer's prompt with memory
+    const promptData = await memory.buildAgentPrompt(approval.reviewer_agent_id, ['qa-review']);
+
+    if (promptData.error) {
+      console.error(`[worker] Failed to build reviewer prompt: ${promptData.error}`);
+      // Auto-approve if reviewer can't be loaded
+      await missions.submitReview(approval.id, { status: 'approved', feedback: 'Auto-approved: reviewer unavailable' });
+      await missions.approveStep(step.id);
+      return;
+    }
+
+    // Get the original agent's name for the review prompt
+    const { data: author } = await supabase
+      .from('agents')
+      .select('display_name')
+      .eq('id', step.assigned_agent_id)
+      .single();
+
+    const reviewPrompt = conversations.buildReviewPrompt(
+      author?.display_name || step.assigned_agent_id,
+      step.result,
+      step.description
+    );
+
+    // Call LLM for the review — always tier1
+    const result = await models.callLLM({
+      systemPrompt: promptData.systemPrompt,
+      userMessage: reviewPrompt,
+      agentId: approval.reviewer_agent_id,
+      forceTier: 'tier1'
+    });
+
+    if (result.error) {
+      console.error(`[worker] Review LLM failed: ${result.error}. Auto-approving.`);
+      await missions.submitReview(approval.id, { status: 'approved', feedback: 'Auto-approved: review LLM failed' });
+      await missions.approveStep(step.id);
+      return;
+    }
+
+    // Parse the review response — look for approval/rejection signals
+    const reviewContent = result.content.toLowerCase();
+    const isApproved = reviewContent.includes('approve') && !reviewContent.includes('not approve') && !reviewContent.includes('do not approve');
+    const isRejected = reviewContent.includes('reject') || reviewContent.includes('send back') || reviewContent.includes('revision needed') || reviewContent.includes('not ready');
+
+    if (isRejected) {
+      // Rejected — send back for revision
+      await missions.submitReview(approval.id, {
+        status: 'rejected',
+        feedback: result.content
+      });
+
+      // Save rejection to reviewer's memory
+      await memory.saveMemory({
+        agentId: approval.reviewer_agent_id,
+        memoryType: 'decision',
+        content: `Rejected deliverable for step #${step.id}: ${result.content.substring(0, 300)}`,
+        summary: `Rejected step #${step.id} — sent back for revision`,
+        topicTags: ['qa-review', 'rejection'],
+        importance: 6,
+        sourceType: 'review'
+      });
+
+      console.log(`[worker] Review #${approval.id}: REJECTED. Step sent back for revision.`);
+
+    } else {
+      // Approved (default if ambiguous — better to ship than block)
+      await missions.submitReview(approval.id, {
+        status: 'approved',
+        feedback: result.content
+      });
+
+      // Check if this was the last review stage
+      if (approval.review_type === 'team_lead') {
+        // Team Lead approved — step is fully approved
+        await missions.approveStep(step.id);
+        await missions.checkMissionCompletion(step.mission_id);
+        console.log(`[worker] Review #${approval.id}: APPROVED by Team Lead. Step #${step.id} complete.`);
+      } else if (approval.review_type === 'qa') {
+        // QA approved — escalate to Team Lead next
+        // The heartbeat's processApprovals() will create the Team Lead approval
+        console.log(`[worker] Review #${approval.id}: APPROVED by QA. Awaiting Team Lead review.`);
+      }
+
+      // Save approval to reviewer's memory
+      await memory.saveMemory({
+        agentId: approval.reviewer_agent_id,
+        memoryType: 'decision',
+        content: `Approved deliverable for step #${step.id}: ${result.content.substring(0, 300)}`,
+        summary: `Approved step #${step.id}`,
+        topicTags: ['qa-review', 'approval'],
+        importance: 5,
+        sourceType: 'review'
+      });
+    }
+
+  } catch (err) {
+    console.error(`[worker] Error processing review #${approval.id}:`, err.message);
+    // Auto-approve on error to prevent blocking
+    await missions.submitReview(approval.id, { status: 'approved', feedback: `Auto-approved: error during review (${err.message})` });
+    await missions.approveStep(step.id);
+  }
+}
+
+// ============================================================
 // HELPERS
 // ============================================================
 
-/**
- * Extract topic tags from a task description for memory retrieval.
- * Simple keyword extraction — good enough for matching.
- */
 function extractTopicTags(description) {
   const lower = description.toLowerCase();
   const tags = [];
@@ -185,7 +303,6 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Graceful shutdown
 process.on('SIGINT', () => {
   console.log('[worker] Shutting down...');
   running = false;
