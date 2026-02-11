@@ -48,50 +48,48 @@ async function notionRequest(method, path, body = null) {
 // ============================================================
 
 /**
- * Find the VoxYZ HQ page and team sub-pages.
- * Searches by title. Caches results.
+ * Find the HQ page and team sub-pages.
+ * Uses direct page ID (from env) to avoid search API issues.
+ * Falls back to search if no ID configured.
  */
 let pageCache = null;
 
 async function getTeamPages() {
   if (pageCache) return pageCache;
 
-  // Search for the top-level workspace page
-  const hqName = process.env.NOTION_HQ_PAGE || 'NERv';
-  const searchResult = await notionRequest('POST', '/search', {
-    query: hqName,
-    filter: { property: 'object', value: 'page' }
-  });
+  // Use direct page ID if configured (most reliable)
+  const hqPageId = process.env.NOTION_HQ_PAGE_ID || '304c642f7e708027958adc5e3c989068';
 
-  if (!searchResult || !searchResult.results || searchResult.results.length === 0) {
-    console.error(`[notion] Could not find "${hqName}" page. Make sure it exists and the integration has access.`);
+  // Get child pages of the HQ page
+  const children = await notionRequest('GET', `/blocks/${hqPageId}/children?page_size=100`);
+
+  if (!children || !children.results) {
+    console.error(`[notion] Could not access HQ page. Check NOTION_HQ_PAGE_ID and integration access.`);
     return null;
   }
 
-  const hqPage = searchResult.results[0];
-
-  // Search for team pages
+  // Find team pages by title among children
   const teamPages = {};
-  const teamNames = {
-    'team-research': 'Research Team',
-    'team-execution': 'Execution Team',
-    'team-advisory': 'Advisory Team'
+  const teamKeywords = {
+    'team-research': 'research',
+    'team-execution': 'execution',
+    'team-advisory': 'advisory'
   };
 
-  for (const [teamId, teamName] of Object.entries(teamNames)) {
-    const result = await notionRequest('POST', '/search', {
-      query: teamName,
-      filter: { property: 'object', value: 'page' }
-    });
-
-    if (result && result.results && result.results.length > 0) {
-      teamPages[teamId] = result.results[0].id;
-      console.log(`[notion] Found ${teamName}: ${result.results[0].id}`);
+  for (const block of children.results) {
+    if (block.type === 'child_page') {
+      const title = (block.child_page?.title || '').toLowerCase();
+      for (const [teamId, keyword] of Object.entries(teamKeywords)) {
+        if (title.includes(keyword)) {
+          teamPages[teamId] = block.id;
+          console.log(`[notion] Found ${block.child_page.title}: ${block.id}`);
+        }
+      }
     }
   }
 
   pageCache = {
-    hqPageId: hqPage.id,
+    hqPageId,
     teamPages
   };
 
