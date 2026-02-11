@@ -76,16 +76,13 @@ async function processNextStep() {
       return;
     }
 
-    // Call the LLM
-    const isComplex = step.model_tier === 'tier2' || step.model_tier === 'tier3';
+    // Call the LLM — always respect the step's assigned tier
     const result = await models.callLLM({
       systemPrompt: promptData.systemPrompt,
       userMessage: step.description,
       agentId: step.assigned_agent_id,
       missionStepId: step.id,
-      forceTier: step.model_tier !== 'tier1' ? step.model_tier : null,
-      isComplex,
-      taskDescription: step.description
+      forceTier: step.model_tier
     });
 
     if (result.error) {
