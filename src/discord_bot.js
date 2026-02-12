@@ -25,6 +25,7 @@ const policy = require('./lib/policy');
 const notion = require('./lib/notion');
 const gdrive = require('./lib/google_drive');
 const alerts = require('./lib/alerts');
+const web = require('./lib/web');
 
 // ============================================================
 // DISCORD CLIENT SETUP
@@ -148,6 +149,12 @@ As Chief of Staff, determine the appropriate action:
 3. If this is casual conversation → engage naturally, share your genuine thoughts, be a real person. Reference past conversations if relevant.
 4. If this requires approval → explain what needs approval and why
 
+CRITICAL — LIVE DATA: If Zero asks about current prices, news, scores, weather, recent events, or ANYTHING that requires up-to-date information, you MUST use your web access. Do NOT guess or use stale training data. Instead, include [WEB_SEARCH:your query] in your response and the system will fetch live results for you. Examples:
+- "What is the price of ETH?" → include [WEB_SEARCH:current ethereum ETH price USD]
+- "What happened in the news today?" → include [WEB_SEARCH:today's top news]
+- "How did the market do?" → include [WEB_SEARCH:stock market today S&P 500]
+If you are not 100% certain the information is current, USE WEB SEARCH. Never hallucinate prices, dates, scores, or stats.
+
 Always be concise, professional, and action-oriented. Reference relevant context from your memory. If Zero is referencing a past conversation, recall what you both said and build on it.
 
 IMPORTANT: End your response with one of these tags so the system knows what to do:
@@ -168,7 +175,27 @@ IMPORTANT: End your response with one of these tags so the system knows what to 
     return;
   }
 
-  const response = result.content;
+  let response = result.content;
+
+  // WEB ACCESS: If Frasier embedded [WEB_SEARCH:] or [WEB_FETCH:] tags, resolve them
+  // and re-call the LLM with the live data. Same pattern as worker.js.
+  const webResolution = await web.resolveWebTags(response);
+  if (webResolution.hasWebTags) {
+    console.log(`[discord] Frasier requested ${webResolution.results.length} web resource(s). Fetching...`);
+    const webContext = web.formatWebResults(webResolution.results);
+
+    const followUp = await models.callLLM({
+      systemPrompt: promptData.systemPrompt,
+      userMessage: `${frasierInstructions}\n\nHere is live web data you requested:\n${webContext}\n\nUsing the live data above, respond to Zero's message. Do NOT include [WEB_SEARCH] or [WEB_FETCH] tags in this response.`,
+      agentId: frasierAgent.id,
+      forceTier: 'tier1'
+    });
+
+    if (followUp.content) {
+      response = followUp.content;
+      console.log('[discord] Frasier web-enriched response generated.');
+    }
+  }
 
   // Parse the action tag
   if (response.includes('[ACTION:PROPOSAL]')) {
