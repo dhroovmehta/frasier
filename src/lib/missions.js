@@ -16,6 +16,28 @@ const EXPERTISE_MAP = {
   knowledge: ['document', 'summarize', 'knowledge', 'wiki', 'organize', 'catalog', 'index']
 };
 
+// Human-readable role titles for hiring proposals
+const ROLE_TITLES = {
+  research: 'Research Analyst',
+  strategy: 'Strategy Lead',
+  content: 'Content Creator',
+  engineering: 'Full-Stack Engineer',
+  qa: 'QA Engineer',
+  marketing: 'Growth Marketer',
+  knowledge: 'Knowledge Curator'
+};
+
+// Keywords for matching agents to role categories (mirrors heartbeat.findBestAgent)
+const ROLE_KEYWORDS = {
+  research: ['research', 'analyst', 'intelligence'],
+  strategy: ['strategy', 'lead', 'strategist'],
+  content: ['content', 'writer', 'creator', 'copywriter'],
+  engineering: ['engineer', 'developer', 'architect'],
+  qa: ['qa', 'quality', 'tester'],
+  marketing: ['marketing', 'growth', 'seo'],
+  knowledge: ['knowledge', 'documentation', 'curator']
+};
+
 // ============================================================
 // PROPOSALS (input queue)
 // ============================================================
@@ -515,6 +537,37 @@ async function getStepsNeedingReview() {
 }
 
 // ============================================================
+// GAP DETECTION (can the team handle this role?)
+// ============================================================
+
+/**
+ * Check if any agent on the team can handle a given role category.
+ * Extracted from heartbeat.findBestAgent() for reuse in gap detection.
+ *
+ * @param {Array} teamAgents - Agents on the team (from agents.getTeamAgents)
+ * @param {string} roleCategory - Role category from routeByKeywords()
+ * @returns {{ canHandle: boolean, matchedAgent: Object|null, roleCategory: string }}
+ */
+function canTeamHandle(teamAgents, roleCategory) {
+  const keywords = ROLE_KEYWORDS[roleCategory] || [];
+
+  for (const agent of teamAgents) {
+    const agentRole = (agent.role || '').toLowerCase();
+    if (keywords.some(kw => agentRole.includes(kw))) {
+      return { canHandle: true, matchedAgent: agent, roleCategory };
+    }
+  }
+
+  // Fallback: team lead can handle anything (they're generalists)
+  const teamLead = teamAgents.find(a => a.agent_type === 'team_lead');
+  if (teamLead) {
+    return { canHandle: true, matchedAgent: teamLead, roleCategory };
+  }
+
+  return { canHandle: false, matchedAgent: null, roleCategory };
+}
+
+// ============================================================
 // SMART ROUTING (keyword-based agent assignment)
 // ============================================================
 
@@ -599,8 +652,11 @@ module.exports = {
   submitReview,
   getPendingApprovals,
   getStepsNeedingReview,
-  // Routing
+  // Routing & gap detection
   routeByKeywords,
+  canTeamHandle,
   checkMissionCompletion,
-  EXPERTISE_MAP
+  EXPERTISE_MAP,
+  ROLE_TITLES,
+  ROLE_KEYWORDS
 };

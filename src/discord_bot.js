@@ -287,13 +287,159 @@ async function handleCommand(message, content) {
       break;
     }
 
+    case 'hire': {
+      const hireId = parseInt(args[0]);
+      if (!hireId) {
+        await message.reply('Usage: `!hire <proposal_id>`');
+        return;
+      }
+
+      const hire = await agents.getHiringProposal(hireId);
+      if (!hire) {
+        await message.reply(`Hiring proposal #${hireId} not found.`);
+        return;
+      }
+      if (hire.status !== 'pending') {
+        await message.reply(`Hiring proposal #${hireId} is already ${hire.status}.`);
+        return;
+      }
+
+      const approved = await agents.approveHiringProposal(hireId);
+      if (approved) {
+        await message.reply(`Hiring proposal #${hireId} approved. A new **${hire.role}** will be created on **${hire.team_id}** shortly.`);
+      } else {
+        await message.reply(`Failed to approve hiring proposal #${hireId}.`);
+      }
+      break;
+    }
+
+    case 'reject': {
+      const rejectId = parseInt(args[0]);
+      if (!rejectId) {
+        await message.reply('Usage: `!reject <proposal_id>`');
+        return;
+      }
+
+      const rejected = await agents.rejectHiringProposal(rejectId);
+      if (rejected) {
+        await message.reply(`Hiring proposal #${rejectId} rejected.`);
+      } else {
+        await message.reply(`Failed to reject hiring proposal #${rejectId}. It may not be pending.`);
+      }
+      break;
+    }
+
+    case 'fire': {
+      const agentName = args.join(' ').trim();
+      if (!agentName) {
+        await message.reply('Usage: `!fire <agent_name>`');
+        return;
+      }
+
+      // Find Frasier — can't fire the chief of staff
+      const frasier = await findFrasier();
+
+      // Find the agent by display_name (case-insensitive)
+      const allAgents = await agents.getAllActiveAgents();
+      const target = allAgents.find(a => a.display_name.toLowerCase() === agentName.toLowerCase());
+
+      if (!target) {
+        await message.reply(`No active agent named "${agentName}" found. Use \`!roster\` to see all agents.`);
+        return;
+      }
+
+      if (frasier && target.id === frasier.id) {
+        await message.reply(`Can't fire Frasier (Chief of Staff). The organization needs a leader.`);
+        return;
+      }
+
+      await agents.setAgentStatus(target.id, 'retired');
+      await message.reply(`**${target.display_name}** (${target.role}) has been retired from ${target.team_id}. Name released back to the pool.`);
+
+      await events.logEvent({
+        eventType: 'agent_fired',
+        agentId: target.id,
+        teamId: target.team_id,
+        severity: 'info',
+        description: `${target.display_name} (${target.role}) retired by Zero`
+      });
+      break;
+    }
+
+    case 'roster': {
+      const teams = await agents.getAllTeams();
+      let reply = '**Agent Roster**\n';
+
+      for (const team of teams) {
+        const teamAgents = await agents.getTeamAgents(team.id);
+        reply += `\n**${team.name}** [${team.status}]\n`;
+
+        if (teamAgents.length > 0) {
+          for (const a of teamAgents) {
+            const typeTag = a.agent_type === 'chief_of_staff' ? ' (CoS)' :
+              a.agent_type === 'team_lead' ? ' (Lead)' :
+              a.agent_type === 'qa' ? ' (QA)' : '';
+            reply += `  - ${a.display_name} — ${a.role}${typeTag} [${a.status}]\n`;
+          }
+        } else {
+          reply += '  No agents assigned\n';
+        }
+      }
+
+      // Show pending hiring proposals
+      const pendingHires = await agents.getAllHiringProposals();
+      const pending = pendingHires.filter(h => h.status === 'pending');
+      const approved = pendingHires.filter(h => h.status === 'approved');
+
+      if (pending.length > 0 || approved.length > 0) {
+        reply += '\n**Hiring Proposals**\n';
+        for (const h of pending) {
+          reply += `  - #${h.id}: ${h.role} for ${h.team_id} [pending — \`!hire ${h.id}\`]\n`;
+        }
+        for (const h of approved) {
+          reply += `  - #${h.id}: ${h.role} for ${h.team_id} [approved — creating agent...]\n`;
+        }
+      }
+
+      await sendSplit(message.channel, reply);
+      break;
+    }
+
+    case 'newbiz': {
+      const bizName = args.join(' ').trim();
+      if (!bizName) {
+        await message.reply('Usage: `!newbiz <business_name>`');
+        return;
+      }
+
+      // Generate a slug-style ID from the name
+      const bizId = bizName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      const biz = await agents.createBusiness({
+        id: bizId,
+        name: bizName,
+        description: `Business unit: ${bizName}`
+      });
+
+      if (biz) {
+        await message.reply(`Business **${bizName}** (${bizId}) created.`);
+      } else {
+        await message.reply(`Failed to create business "${bizName}". It may already exist.`);
+      }
+      break;
+    }
+
     case 'help': {
       await message.reply(
         '**Commands:**\n' +
         '`!status` — System overview\n' +
         '`!teams` — List all teams and agents\n' +
+        '`!roster` — Full agent roster + pending hires\n' +
         '`!costs` — Today\'s LLM costs\n' +
         '`!approve <step_id>` — Approve a pending step\n' +
+        '`!hire <id>` — Approve a hiring proposal\n' +
+        '`!reject <id>` — Reject a hiring proposal\n' +
+        '`!fire <name>` — Retire an agent\n' +
+        '`!newbiz <name>` — Create a business unit\n' +
         '`!activate <team-id>` — Activate a team\n' +
         '`!deactivate <team-id>` — Deactivate a team\n' +
         '\nOr just type normally to talk to Frasier.'
@@ -318,6 +464,7 @@ async function pollForAnnouncements() {
   setInterval(async () => {
     try {
       await announceCompletedSteps();
+      await announceHiringProposals();
       await announceAlerts();
     } catch (err) {
       console.error('[discord] Announcement polling error:', err.message);
@@ -384,6 +531,29 @@ async function announceCompletedSteps() {
       .from('mission_steps')
       .update({ announced: true })
       .eq('id', step.id);
+  }
+}
+
+/**
+ * Announce pending hiring proposals to Discord.
+ * Posts to #frasier-dm so Zero can approve with !hire <id>.
+ */
+async function announceHiringProposals() {
+  const pendingHires = await agents.getPendingHiringProposals();
+  if (pendingHires.length === 0) return;
+
+  const channel = channels['frasier-dm'] || channels['general'];
+  if (!channel) return;
+
+  for (const hire of pendingHires) {
+    const msg = `**Hiring Proposal #${hire.id}**\n` +
+      `Role: ${hire.role}\n` +
+      `Team: ${hire.team_id}\n` +
+      `Reason: ${hire.justification || 'Team needs this role'}\n\n` +
+      `Reply \`!hire ${hire.id}\` to approve or \`!reject ${hire.id}\` to reject.`;
+
+    await sendSplit(channel, msg);
+    await agents.markHiringProposalAnnounced(hire.id);
   }
 }
 

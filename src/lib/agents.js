@@ -343,6 +343,274 @@ async function setTeamLead(teamId, agentId) {
 }
 
 // ============================================================
+// BUSINESS MANAGEMENT (multi-business scaffolding)
+// ============================================================
+
+/**
+ * Create a new business unit.
+ */
+async function createBusiness({ id, name, description = null }) {
+  const { data, error } = await supabase
+    .from('businesses')
+    .insert({ id, name, description })
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`[agents] Failed to create business ${id}:`, error.message);
+    return null;
+  }
+
+  console.log(`[agents] Business "${name}" (${id}) created`);
+  return data;
+}
+
+/**
+ * Get all businesses.
+ */
+async function getAllBusinesses() {
+  const { data, error } = await supabase
+    .from('businesses')
+    .select('*')
+    .order('created_at');
+
+  if (error) {
+    console.error('[agents] Failed to get businesses:', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+// ============================================================
+// HIRING PROPOSALS (on-demand agent hiring lifecycle)
+// ============================================================
+
+/**
+ * Create a hiring proposal. Called when a task arrives that no agent can handle.
+ * Duplicate detection: won't create a second proposal for the same role+team if one is pending.
+ *
+ * @param {Object} params
+ * @param {string} params.role - Human-readable role title (e.g. "Content Creator")
+ * @param {string} params.teamId - Team that needs the hire
+ * @param {string} params.justification - Why this hire is needed
+ * @param {number} [params.triggeringProposalId] - The mission_proposal that triggered this
+ * @param {string} [params.businessId] - Business unit (default: 'nerv')
+ * @returns {Object|null} The created hiring proposal, or null if duplicate/error
+ */
+async function createHiringProposal({
+  role,
+  teamId,
+  justification,
+  triggeringProposalId = null,
+  businessId = 'nerv'
+}) {
+  // Duplicate detection: skip if pending proposal already exists for same role+team
+  const existing = await checkDuplicateHiringProposal(role, teamId);
+  if (existing) {
+    console.log(`[agents] Hiring proposal for ${role} on ${teamId} already pending (#${existing.id}). Skipping.`);
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('hiring_proposals')
+    .insert({
+      role,
+      title: role,
+      team_id: teamId,
+      business_id: businessId,
+      justification,
+      triggering_proposal_id: triggeringProposalId,
+      status: 'pending'
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`[agents] Failed to create hiring proposal:`, error.message);
+    return null;
+  }
+
+  console.log(`[agents] Hiring proposal #${data.id} created: ${role} for team ${teamId}`);
+  return data;
+}
+
+/**
+ * Check if a pending hiring proposal already exists for a role+team.
+ */
+async function checkDuplicateHiringProposal(role, teamId) {
+  const { data } = await supabase
+    .from('hiring_proposals')
+    .select('*')
+    .eq('role', role)
+    .eq('team_id', teamId)
+    .eq('status', 'pending')
+    .limit(1)
+    .maybeSingle();
+
+  return data || null;
+}
+
+/**
+ * Get approved but unprocessed hiring proposals (for heartbeat to pick up).
+ */
+async function getApprovedHires(limit = 1) {
+  const { data, error } = await supabase
+    .from('hiring_proposals')
+    .select('*')
+    .eq('status', 'approved')
+    .eq('processed', false)
+    .order('created_at', { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    console.error('[agents] Failed to get approved hires:', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Get pending, unannounced hiring proposals (for Discord bot to announce).
+ */
+async function getPendingHiringProposals() {
+  const { data, error } = await supabase
+    .from('hiring_proposals')
+    .select('*')
+    .eq('status', 'pending')
+    .eq('announced', false)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('[agents] Failed to get pending hiring proposals:', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Approve a hiring proposal. Called when Zero runs !hire <id>.
+ */
+async function approveHiringProposal(proposalId, approvedBy = 'zero') {
+  const { data, error } = await supabase
+    .from('hiring_proposals')
+    .update({
+      status: 'approved',
+      approved_by: approvedBy,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', proposalId)
+    .eq('status', 'pending')
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`[agents] Failed to approve hiring proposal #${proposalId}:`, error.message);
+    return null;
+  }
+
+  console.log(`[agents] Hiring proposal #${proposalId} approved by ${approvedBy}`);
+  return data;
+}
+
+/**
+ * Reject a hiring proposal.
+ */
+async function rejectHiringProposal(proposalId, rejectedBy = 'zero') {
+  const { data, error } = await supabase
+    .from('hiring_proposals')
+    .update({
+      status: 'rejected',
+      approved_by: rejectedBy,
+      processed: true,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', proposalId)
+    .eq('status', 'pending')
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`[agents] Failed to reject hiring proposal #${proposalId}:`, error.message);
+    return null;
+  }
+  return data;
+}
+
+/**
+ * Mark a hiring proposal as completed after agent creation.
+ * Links the new agent and re-queues the stalled mission proposal.
+ */
+async function completeHiringProposal(proposalId, createdAgentId) {
+  const { data, error } = await supabase
+    .from('hiring_proposals')
+    .update({
+      status: 'completed',
+      processed: true,
+      created_agent_id: createdAgentId,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', proposalId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`[agents] Failed to complete hiring proposal #${proposalId}:`, error.message);
+    return null;
+  }
+
+  console.log(`[agents] Hiring proposal #${proposalId} completed, agent ${createdAgentId} created`);
+  return data;
+}
+
+/**
+ * Mark a hiring proposal as announced (Discord posted).
+ */
+async function markHiringProposalAnnounced(proposalId) {
+  const { error } = await supabase
+    .from('hiring_proposals')
+    .update({ announced: true })
+    .eq('id', proposalId);
+
+  if (error) {
+    console.error(`[agents] Failed to mark hiring proposal #${proposalId} as announced:`, error.message);
+  }
+}
+
+/**
+ * Get a hiring proposal by ID.
+ */
+async function getHiringProposal(proposalId) {
+  const { data, error } = await supabase
+    .from('hiring_proposals')
+    .select('*')
+    .eq('id', proposalId)
+    .single();
+
+  if (error) {
+    console.error(`[agents] Failed to get hiring proposal #${proposalId}:`, error.message);
+    return null;
+  }
+  return data;
+}
+
+/**
+ * Get all non-rejected hiring proposals (for !roster display).
+ */
+async function getAllHiringProposals() {
+  const { data, error } = await supabase
+    .from('hiring_proposals')
+    .select('*')
+    .neq('status', 'rejected')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[agents] Failed to get all hiring proposals:', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+// ============================================================
 // NAME POOL STATS
 // ============================================================
 
@@ -387,6 +655,20 @@ module.exports = {
   getAllTeams,
   setTeamStatus,
   setTeamLead,
+  // Business management
+  createBusiness,
+  getAllBusinesses,
+  // Hiring proposals
+  createHiringProposal,
+  checkDuplicateHiringProposal,
+  getApprovedHires,
+  getPendingHiringProposals,
+  approveHiringProposal,
+  rejectHiringProposal,
+  completeHiringProposal,
+  markHiringProposalAnnounced,
+  getHiringProposal,
+  getAllHiringProposals,
   // Name pool
   getNamePoolStats
 };
