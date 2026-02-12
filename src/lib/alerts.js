@@ -2,8 +2,17 @@
 // WHY: Zero needs to know when things break, costs spike, or the system needs attention.
 // Every alert goes to BOTH Discord (#alerts) and email (drew@epyon.capital).
 // Email fails silently — Discord is the primary channel, email is the safety net.
+//
+// CRITICAL: nodemailer is loaded with try/catch so a missing dependency never
+// crashes the entire process. Learned the hard way — a missing nodemailer took
+// down discord_bot + heartbeat simultaneously, killing all monitoring.
 
-const nodemailer = require('nodemailer');
+let nodemailer = null;
+try {
+  nodemailer = require('nodemailer');
+} catch (err) {
+  console.warn('[alerts] nodemailer not installed — email alerts disabled. Run: npm install nodemailer');
+}
 
 // Discord channels map — injected by discord_bot.js on startup
 let discordChannels = null;
@@ -108,6 +117,11 @@ async function postToDiscord(channelName, message) {
  * GMAIL_APP_PASSWORD is a 16-char app password from Google, NOT the account password.
  */
 async function sendEmail({ to, subject, body }) {
+  if (!nodemailer) {
+    // nodemailer not installed — skip silently
+    return;
+  }
+
   const gmailUser = process.env.GMAIL_USER;
   const gmailPass = process.env.GMAIL_APP_PASSWORD;
 

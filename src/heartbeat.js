@@ -10,6 +10,7 @@
 // No WebSockets. No pub/sub. Just polling. It's simpler and it works.
 
 require('dotenv').config();
+const http = require('http');
 const missions = require('./lib/missions');
 const agents = require('./lib/agents');
 const conversations = require('./lib/conversations');
@@ -25,9 +26,11 @@ const github = require('./lib/github');
 const notion = require('./lib/notion');
 
 const POLL_INTERVAL_MS = 30 * 1000; // 30 seconds
+const HEALTH_PORT = process.env.HEALTH_PORT || 8787;
 let running = true;
 let lastStandupDate = null; // Track if standup ran today
 let lastCostAlertDate = null; // Track if cost alert fired today
+let lastTickTime = null; // Tracked by health endpoint to detect stalls
 let lastHealthCheckTime = 0; // Timestamp of last health check run
 let lastDailySummaryDate = null; // Track if daily summary ran today
 let lastBackupDate = null; // Track if backup ran today
@@ -40,6 +43,14 @@ const HEALTH_CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 async function main() {
   console.log('[heartbeat] Starting orchestration engine...');
+
+  // EXTERNAL HEALTH ENDPOINT — independent of internal monitoring.
+  // WHY: Internal monitoring can't detect its own crashes. An external service
+  // (UptimeRobot, Better Uptime, etc.) pings this endpoint every 5 minutes.
+  // If heartbeat is down, the external service emails Zero directly —
+  // completely independent of our nodemailer/alerts pipeline.
+  startHealthServer();
+
   await events.logEvent({
     eventType: 'heartbeat_started',
     severity: 'info',
@@ -49,6 +60,7 @@ async function main() {
   while (running) {
     try {
       await tick();
+      lastTickTime = Date.now();
     } catch (err) {
       console.error('[heartbeat] Unexpected error in tick:', err.message);
       await events.logEvent({
@@ -895,6 +907,53 @@ async function runDailyStandup() {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ============================================================
+// EXTERNAL HEALTH ENDPOINT
+// ============================================================
+
+/**
+ * Lightweight HTTP server for external uptime monitoring.
+ * Returns JSON with process status so UptimeRobot (or similar) can verify:
+ *   1. The heartbeat process is alive
+ *   2. The tick loop is actually running (not stalled)
+ *
+ * Setup: Point UptimeRobot (free, 5-min checks) at http://<VPS_IP>:8787/health
+ * Alert: UptimeRobot emails Zero directly if endpoint goes down — completely
+ * independent of our internal Discord/email alerting pipeline.
+ */
+function startHealthServer() {
+  const server = http.createServer((req, res) => {
+    if (req.url === '/health' && req.method === 'GET') {
+      const now = Date.now();
+      const tickAge = lastTickTime ? Math.round((now - lastTickTime) / 1000) : null;
+      const stalled = tickAge !== null && tickAge > 120; // 2 min without a tick = stalled
+
+      const status = {
+        status: stalled ? 'stalled' : 'ok',
+        process: 'heartbeat',
+        uptime: Math.round(process.uptime()),
+        lastTickSecondsAgo: tickAge,
+        memoryMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        timestamp: new Date().toISOString()
+      };
+
+      const httpCode = stalled ? 503 : 200;
+      res.writeHead(httpCode, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(status));
+    } else {
+      res.writeHead(404);
+      res.end('Not found');
+    }
+  });
+
+  server.listen(HEALTH_PORT, () => {
+    console.log(`[heartbeat] Health endpoint listening on port ${HEALTH_PORT}`);
+  });
+
+  // Don't let the health server prevent shutdown
+  server.unref();
 }
 
 // Graceful shutdown
