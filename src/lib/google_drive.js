@@ -189,11 +189,12 @@ async function publishDeliverable({ title, content, teamId, agentName, missionId
   const fullContent = `Agent: ${agentName} | Mission #${missionId} | Step #${stepId} | ${dateStr}\n${'─'.repeat(60)}\n\n${content}`;
 
   try {
-    // Create a Google Doc with the content
+    // Upload as a text file (service accounts have no Drive storage,
+    // so we transfer ownership to the founder's account after creation)
     const file = await drive.files.create({
       requestBody: {
-        name: title,
-        mimeType: 'application/vnd.google-apps.document',
+        name: `${title}.txt`,
+        mimeType: 'text/plain',
         parents: [parentFolderId]
       },
       media: {
@@ -206,7 +207,21 @@ async function publishDeliverable({ title, content, teamId, agentName, missionId
     const docId = file.data.id;
     const docUrl = file.data.webViewLink;
 
-    // Make the doc viewable by anyone with the link
+    // Transfer ownership to the founder so storage counts against their 15GB
+    const ownerEmail = process.env.GMAIL_USER;
+    if (ownerEmail) {
+      await drive.permissions.create({
+        fileId: docId,
+        transferOwnership: true,
+        requestBody: {
+          role: 'owner',
+          type: 'user',
+          emailAddress: ownerEmail
+        }
+      });
+    }
+
+    // Also make viewable by anyone with link
     await drive.permissions.create({
       fileId: docId,
       requestBody: {
