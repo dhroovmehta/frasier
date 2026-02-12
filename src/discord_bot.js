@@ -138,10 +138,14 @@ async function handleFrasierMessage(message, content) {
     return;
   }
 
+  // PRE-FETCH: If Zero's message contains URLs (tweets, articles), fetch them now
+  // so Frasier has the actual content. Twitter/X URLs auto-rewrite to fxtwitter.
+  const { enrichedText: enrichedContent } = await web.prefetchUrls(content);
+
   // Add context about what Frasier should do
   const frasierInstructions = `Zero (the founder) just sent you this message via Discord:
 
-"${content}"
+"${enrichedContent}"
 
 As Chief of Staff, determine the appropriate action:
 1. If this is a task or request → acknowledge it, state which team/agent you'll route it to, and what the expected deliverable is

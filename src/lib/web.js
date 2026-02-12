@@ -158,6 +158,92 @@ async function searchDuckDuckGo(query, maxResults = 5) {
 }
 
 // ============================================================
+// URL PRE-FETCHING (auto-fetch URLs in task descriptions)
+// ============================================================
+
+/**
+ * Scan text for URLs and pre-fetch their content.
+ * WHY: When Zero pastes a tweet or article URL in a task, the agent needs the
+ * actual content — not the URL string. This runs BEFORE the LLM call so the
+ * agent has real context from day one, instead of hallucinating.
+ *
+ * Special handling:
+ * - Twitter/X URLs → rewritten to api.fxtwitter.com (X blocks scrapers)
+ * - Other URLs → fetched directly via fetchPage()
+ *
+ * @param {string} text - Task description that may contain URLs
+ * @returns {{ enrichedText: string, fetchedUrls: number }}
+ */
+async function prefetchUrls(text) {
+  // Find all URLs in the text
+  const urlRegex = /https?:\/\/[^\s\])<>,]+/g;
+  const urls = [...new Set(text.match(urlRegex) || [])]; // dedupe
+
+  if (urls.length === 0) return { enrichedText: text, fetchedUrls: 0 };
+
+  const fetched = [];
+
+  for (const rawUrl of urls.slice(0, 3)) { // cap at 3 URLs to limit latency
+    const url = rewriteUrl(rawUrl);
+    const isTwitter = url.includes('fxtwitter.com');
+
+    try {
+      const result = await fetchPage(url, 4000);
+      if (result.error) {
+        console.log(`[web] Pre-fetch failed for ${rawUrl}: ${result.error}`);
+        continue;
+      }
+
+      // fxtwitter returns JSON — extract the readable tweet data
+      if (isTwitter && result.content) {
+        const parsed = parseTweetJson(result.content);
+        if (parsed) {
+          fetched.push({ originalUrl: rawUrl, title: `Tweet by @${parsed.author}`, content: parsed.text });
+          continue;
+        }
+      }
+
+      if (result.content && result.content.length > 50) {
+        fetched.push({ originalUrl: rawUrl, title: result.title, content: result.content });
+      }
+    } catch (err) {
+      console.error(`[web] Pre-fetch error for ${rawUrl}: ${err.message}`);
+    }
+  }
+
+  if (fetched.length === 0) return { enrichedText: text, fetchedUrls: 0 };
+
+  // Build context block to append to the task description
+  const lines = ['\n\n# PRE-FETCHED URL CONTENT (auto-retrieved from URLs in the task)', ''];
+  for (const f of fetched) {
+    lines.push(`## ${f.originalUrl}`);
+    if (f.title && f.title !== f.originalUrl) lines.push(`Title: ${f.title}`);
+    lines.push(f.content);
+    lines.push('');
+  }
+
+  console.log(`[web] Pre-fetched ${fetched.length} URL(s) from task description`);
+  return { enrichedText: text + lines.join('\n'), fetchedUrls: fetched.length };
+}
+
+/**
+ * Rewrite URLs that need special handling (Twitter/X → fxtwitter API, etc.)
+ * WHY: x.com and twitter.com block non-authenticated scraping entirely.
+ * api.fxtwitter.com returns clean JSON with tweet text, no auth needed.
+ */
+function rewriteUrl(url) {
+  // Twitter/X → fxtwitter API (returns JSON with tweet text)
+  const twitterMatch = url.match(/^https?:\/\/(?:www\.)?(twitter\.com|x\.com)\/([^/]+)\/status\/(\d+)/i);
+  if (twitterMatch) {
+    const rewritten = `https://api.fxtwitter.com/${twitterMatch[2]}/status/${twitterMatch[3]}`;
+    console.log(`[web] Rewrote Twitter URL → ${rewritten}`);
+    return rewritten;
+  }
+
+  return url;
+}
+
+// ============================================================
 // AGENT TOOL INTERFACE
 // ============================================================
 
@@ -228,6 +314,43 @@ function formatWebResults(results) {
   }
 
   return lines.join('\n');
+}
+
+// ============================================================
+// TWEET PARSING (fxtwitter JSON → readable text)
+// ============================================================
+
+/**
+ * Parse fxtwitter API JSON into a clean, readable format for LLM context.
+ * WHY: Raw JSON wastes tokens. Extract just what the agent needs: who said what,
+ * engagement stats (to gauge credibility), and media descriptions.
+ */
+function parseTweetJson(jsonStr) {
+  try {
+    const data = JSON.parse(jsonStr);
+    const tweet = data.tweet;
+    if (!tweet) return null;
+
+    const author = tweet.author?.screen_name || 'unknown';
+    const name = tweet.author?.name || author;
+    const followers = tweet.author?.followers || 0;
+    const lines = [
+      `@${author} (${name}, ${followers.toLocaleString()} followers):`,
+      '',
+      tweet.text || tweet.raw_text?.text || '',
+      '',
+      `Engagement: ${(tweet.likes || 0).toLocaleString()} likes, ${(tweet.retweets || 0).toLocaleString()} retweets, ${(tweet.replies || 0).toLocaleString()} replies, ${(tweet.views || 0).toLocaleString()} views`,
+      `Posted: ${tweet.created_at || 'unknown'}`
+    ];
+
+    if (tweet.media?.photos?.length > 0) {
+      lines.push(`Attached: ${tweet.media.photos.length} image(s)`);
+    }
+
+    return { author, text: lines.join('\n') };
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================
@@ -326,6 +449,7 @@ function parseSearchResults(html, maxResults) {
 module.exports = {
   fetchPage,
   searchWeb,
+  prefetchUrls,
   resolveWebTags,
   formatWebResults,
   htmlToText

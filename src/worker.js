@@ -79,10 +79,15 @@ async function processNextStep() {
       return;
     }
 
+    // PRE-FETCH: Auto-fetch any URLs in the task description before the LLM call.
+    // WHY: If Zero pastes a tweet or article link, the agent needs the actual content,
+    // not the URL string. Twitter/X URLs get rewritten to fxtwitter for access.
+    const { enrichedText } = await web.prefetchUrls(step.description);
+
     // Call the LLM — always respect the step's assigned tier
     const result = await models.callLLM({
       systemPrompt: promptData.systemPrompt,
-      userMessage: step.description,
+      userMessage: enrichedText,
       agentId: step.assigned_agent_id,
       missionStepId: step.id,
       forceTier: step.model_tier
