@@ -124,7 +124,7 @@ async function handleFrasierMessage(message, content) {
     return;
   }
 
-  const promptData = await memory.buildAgentPrompt(frasierAgent.id, ['founder-request', 'delegation']);
+  const promptData = await memory.buildAgentPrompt(frasierAgent.id, ['founder-interaction', 'founder-request', 'delegation', 'discord']);
   if (promptData.error) {
     await message.reply(`Error loading Frasier: ${promptData.error}`);
     return;
@@ -181,16 +181,32 @@ IMPORTANT: End your response with one of these tags so the system knows what to 
     await sendSplit(message.channel, cleanResponse);
   }
 
-  // Save to Frasier's memory
+  // Save to Frasier's memory — importance 8 because founder messages are strategic context
   await memory.saveMemory({
     agentId: frasierAgent.id,
     memoryType: 'conversation',
     content: `Zero said: "${content}"\n\nI responded: "${response.substring(0, 300)}"`,
     summary: `Conversation with Zero: ${content.substring(0, 100)}`,
-    topicTags: ['founder-interaction', 'discord'],
-    importance: 7,
+    topicTags: ['founder-interaction', 'founder-request', 'discord', 'delegation'],
+    importance: 8,
     sourceType: 'conversation'
   });
+
+  // LESSON EXTRACTION: If Zero gives a directive, preference, or strategic instruction,
+  // save it as a permanent lesson so Frasier NEVER forgets it.
+  // WHY: Memories rotate out of the 10-recent window. Lessons are always included (top 5).
+  // This means "our target is crypto traders" stays in Frasier's brain forever.
+  const isDirective = detectFounderDirective(content);
+  if (isDirective) {
+    await memory.saveLesson({
+      agentId: frasierAgent.id,
+      lesson: `Zero's instruction: "${content.substring(0, 400)}"`,
+      context: `Founder directive via Discord`,
+      category: 'founder-directive',
+      importance: 9 // Highest — founder instructions override everything
+    });
+    console.log(`[discord] Saved founder directive as permanent lesson: "${content.substring(0, 80)}..."`);
+  }
 
   // Save conversation to history
   await memory.saveConversation({
@@ -653,6 +669,35 @@ async function sendSplit(channel, text) {
   for (const chunk of chunks) {
     await channel.send(chunk);
   }
+}
+
+/**
+ * Detect if a founder message contains a directive, preference, or strategic instruction
+ * that should be saved as a permanent lesson.
+ * Simple keyword heuristic — errs on the side of saving (better to remember too much
+ * than to forget a critical instruction).
+ */
+function detectFounderDirective(content) {
+  const lower = content.toLowerCase();
+
+  // Direct instructions
+  const directiveSignals = [
+    'always ', 'never ', 'from now on', 'going forward', 'remember that',
+    'make sure', 'don\'t forget', 'priority is', 'focus on', 'target is',
+    'our goal', 'our target', 'we need to', 'i want', 'i need',
+    'stop doing', 'start doing', 'change the', 'update the',
+    'the budget is', 'the deadline is', 'the client', 'the customer',
+    'important:', 'note:', 'fyi:', 'heads up'
+  ];
+
+  for (const signal of directiveSignals) {
+    if (lower.includes(signal)) return true;
+  }
+
+  // Long messages (>100 chars) that aren't questions are likely strategic context
+  if (content.length > 100 && !content.trim().endsWith('?')) return true;
+
+  return false;
 }
 
 // ============================================================
