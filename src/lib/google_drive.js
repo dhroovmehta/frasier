@@ -19,18 +19,36 @@ let driveClient = null;
 function getDriveClient() {
   if (driveClient) return driveClient;
 
-  const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!keyJson) {
-    console.error('[gdrive] Missing GOOGLE_SERVICE_ACCOUNT_KEY');
-    return null;
-  }
-
   try {
-    const key = JSON.parse(keyJson);
-    // dotenv reads \n as literal text — convert to real newlines for the crypto library
-    if (key.private_key) {
-      key.private_key = key.private_key.replace(/\\n/g, '\n');
+    let key;
+
+    // Option 1: Read from a JSON file (most reliable — avoids dotenv escaping issues)
+    const keyFilePath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE
+      || require('path').join(__dirname, '../../credentials/google-service-account.json');
+
+    try {
+      const fs = require('fs');
+      if (fs.existsSync(keyFilePath)) {
+        key = JSON.parse(fs.readFileSync(keyFilePath, 'utf8'));
+        console.log('[gdrive] Loaded service account from file');
+      }
+    } catch (fileErr) {
+      // Fall through to env var
     }
+
+    // Option 2: Fall back to env var
+    if (!key) {
+      const keyJson = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+      if (!keyJson) {
+        console.error('[gdrive] Missing service account key. Place it at credentials/google-service-account.json');
+        return null;
+      }
+      key = JSON.parse(keyJson);
+      if (key.private_key) {
+        key.private_key = key.private_key.replace(/\\n/g, '\n');
+      }
+    }
+
     const auth = new google.auth.GoogleAuth({
       credentials: key,
       scopes: ['https://www.googleapis.com/auth/drive']
@@ -39,7 +57,7 @@ function getDriveClient() {
     driveClient = google.drive({ version: 'v3', auth });
     return driveClient;
   } catch (err) {
-    console.error('[gdrive] Failed to parse service account key:', err.message);
+    console.error('[gdrive] Failed to initialize Drive client:', err.message);
     return null;
   }
 }
