@@ -163,10 +163,15 @@ SYSTEM SPEED: Your team is AI-powered. Tasks complete in MINUTES, not days. Neve
 
 Always be concise, professional, and action-oriented. Reference relevant context from your memory. If Zero is referencing a past conversation, recall what you both said and build on it.
 
-IMPORTANT: End your response with one of these tags so the system knows what to do:
-[ACTION:PROPOSAL] — if this should become a mission
-[ACTION:RESPONSE] — if this is just a conversation reply (including casual chat)
-[ACTION:APPROVAL_NEEDED] — if you need Zero's approval for something`;
+CRITICAL ACTION TAGS — You MUST end EVERY response with exactly ONE of these tags:
+
+[ACTION:PROPOSAL] — USE THIS when Zero is asking for ANY work to be done. This includes: research, analysis, building, writing, creating, investigating, vetting, finding information, comparing options, making recommendations, or any request where a deliverable is expected. When in doubt, USE THIS. Your response should acknowledge the task and state who you'll route it to — the actual work happens in the pipeline AFTER the proposal is created.
+
+[ACTION:RESPONSE] — ONLY use this for pure conversation with NO work request. Examples: greetings, casual chat, status questions, opinions, thank-yous, jokes. If Zero is asking you to DO anything or FIND OUT anything, this is the WRONG tag.
+
+[ACTION:APPROVAL_NEEDED] — Use when something requires Zero's explicit approval before proceeding (e.g., spending over budget, major strategic decisions).
+
+DEFAULT TO [ACTION:PROPOSAL]. It is far worse to miss a task (Zero waits forever for nothing) than to create an unnecessary proposal (which is harmless).`;
 
   // Call LLM as Frasier — always Tier 1, Frasier is just routing/responding
   const result = await models.callLLM({
