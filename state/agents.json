@@ -1,0 +1,72 @@
+[
+  {
+    "id": "frasier-cos",
+    "name": "Frasier (Chief of Staff)",
+    "display_name": "Frasier",
+    "role": "Chief of Staff / COO",
+    "title": "Chief of Staff",
+    "team_id": null,
+    "agent_type": "chief_of_staff",
+    "status": "active",
+    "persona_id": 3,
+    "created_at": "2026-02-11T20:03:33.72087+00:00",
+    "updated_at": "2026-02-11T20:03:33.72087+00:00",
+    "retired_at": null
+  },
+  {
+    "id": "agent-gendo-1770840214305",
+    "name": "Gendo (Research Strategist & Team Lead)",
+    "display_name": "Gendo",
+    "role": "Research Strategist & Team Lead",
+    "title": "Team Lead — Research",
+    "team_id": "team-research",
+    "agent_type": "team_lead",
+    "status": "active",
+    "persona_id": 4,
+    "created_at": "2026-02-11T20:03:34.399032+00:00",
+    "updated_at": "2026-02-11T20:03:34.399032+00:00",
+    "retired_at": null
+  },
+  {
+    "id": "agent-sahaquiel-1770840215198",
+    "name": "Sahaquiel (Research Analyst)",
+    "display_name": "Sahaquiel",
+    "role": "Research Analyst",
+    "title": "Research Analyst",
+    "team_id": "team-research",
+    "agent_type": "sub_agent",
+    "status": "active",
+    "persona_id": 5,
+    "created_at": "2026-02-11T20:03:35.284548+00:00",
+    "updated_at": "2026-02-11T20:03:35.284548+00:00",
+    "retired_at": null
+  },
+  {
+    "id": "agent-toji-1770840215950",
+    "name": "Toji (Financial & Business Analyst)",
+    "display_name": "Toji",
+    "role": "Financial & Business Analyst",
+    "title": "Financial Analyst",
+    "team_id": "team-research",
+    "agent_type": "sub_agent",
+    "status": "active",
+    "persona_id": 6,
+    "created_at": "2026-02-11T20:03:36.023501+00:00",
+    "updated_at": "2026-02-11T20:03:36.023501+00:00",
+    "retired_at": null
+  },
+  {
+    "id": "test-memory-agent",
+    "name": "Memory Test Agent",
+    "display_name": "Rei",
+    "role": "Memory System Tester",
+    "title": "QA Specialist",
+    "team_id": null,
+    "agent_type": "sub_agent",
+    "status": "active",
+    "persona_id": 7,
+    "created_at": "2026-02-11T19:49:32.760573+00:00",
+    "updated_at": "2026-02-11T19:49:32.760573+00:00",
+    "retired_at": null
+  }
+]
