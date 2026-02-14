@@ -1,5 +1,5 @@
 -- ============================================================
--- VoxYZ Agent World — Migration #2: Hiring System & Businesses
+-- Frasier — Migration #2: Hiring System & Businesses
 -- Created: Feb 11, 2026
 -- IMPORTANT: No ALTER TABLE on existing tables (avoids PGRST204 cache bug).
 -- Two new tables only: businesses, hiring_proposals.

@@ -1,5 +1,5 @@
 -- ============================================================
--- VoxYZ Agent World — Complete Database Schema v2.1
+-- Frasier — Complete Database Schema v2.1
 -- Created: Feb 11, 2026
 -- IMPORTANT: Create ALL tables and columns upfront.
 -- Adding columns later risks Supabase PGRST204 cache bug.
