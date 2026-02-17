@@ -242,6 +242,10 @@ async function callLLM({
  * @returns {string} 'tier1' | 'tier2'
  */
 function selectTier(isComplex, taskDescription = '', stepContext = {}) {
+  // Don't upgrade to tier2 if Manus isn't configured — stay on tier1
+  const manusAvailable = MODELS.tier2.endpoint && process.env[MODELS.tier2.apiKeyEnv];
+  if (!manusAvailable) return 'tier1';
+
   if (isComplex) return 'tier2';
 
   // Final step in multi-step mission → always tier2 for quality
