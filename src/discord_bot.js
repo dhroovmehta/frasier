@@ -700,7 +700,22 @@ async function announceCompletedSteps() {
     console.error('[discord] announceCompletedSteps query error:', error.message || error);
     return;
   }
-  if (!steps || steps.length === 0) return;
+  if (!steps || steps.length === 0) {
+    // DEBUG: Check what steps actually exist to diagnose why none are unannounced
+    const { data: allCompleted } = await supabase
+      .from('mission_steps')
+      .select('id, status, announced')
+      .eq('status', 'completed')
+      .limit(5);
+    const { data: anyPending } = await supabase
+      .from('mission_steps')
+      .select('id, status, announced')
+      .neq('status', 'completed')
+      .limit(5);
+    console.log(`[discord] No unannounced completed steps. Completed steps sample:`, JSON.stringify(allCompleted));
+    console.log(`[discord] Non-completed steps sample:`, JSON.stringify(anyPending));
+    return;
+  }
 
   console.log(`[discord] Found ${steps.length} completed steps to announce`);
 
