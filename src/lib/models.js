@@ -49,7 +49,10 @@ const COMPLEX_KEYWORDS = [
   'strategy', 'analysis', 'architecture', 'financial', 'research',
   'deep dive', 'multi-step', 'persona generation', 'competitive',
   'business plan', 'market analysis', 'code review', 'security audit',
-  'long-form', 'comprehensive', 'detailed report'
+  'long-form', 'comprehensive', 'detailed report',
+  'requirements', 'specification', 'design document',
+  'go-to-market', 'pricing model', 'revenue model',
+  'technical design', 'system design'
 ];
 
 // ============================================================
@@ -194,11 +197,20 @@ async function callLLM({
 // ============================================================
 
 /**
- * Auto-select the appropriate tier based on complexity flags and keywords.
+ * Auto-select the appropriate tier based on complexity flags, keywords, and step context.
  * Default is always Tier 1 (MiniMax). Complex tasks route to Tier 2 (Manus).
+ *
+ * @param {boolean} isComplex - Explicit complexity flag
+ * @param {string} taskDescription - Task text for keyword matching
+ * @param {Object} [stepContext] - Optional step context
+ * @param {boolean} [stepContext.isFinalStep] - If true, upgrades to tier2 for quality
+ * @returns {string} 'tier1' | 'tier2'
  */
-function selectTier(isComplex, taskDescription = '') {
+function selectTier(isComplex, taskDescription = '', stepContext = {}) {
   if (isComplex) return 'tier2';
+
+  // Final step in multi-step mission → always tier2 for quality
+  if (stepContext && stepContext.isFinalStep) return 'tier2';
 
   // Auto-detect complexity from task description
   const lower = taskDescription.toLowerCase();

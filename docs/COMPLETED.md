@@ -1,6 +1,6 @@
 # Frasier — Completed Features
 
-> Last updated: Feb 11, 2026
+> Last updated: Feb 17, 2026
 
 ---
 
@@ -205,3 +205,125 @@
 - Tier 3 authorization enforced
 - Spending limits, operating hours, cost alert threshold defined
 - **Gap:** Agents don't proactively check policy before general actions
+
+---
+
+## System Overhaul (Feb 17, 2026) — 4 Critical Failures Fixed
+
+> 84 unit tests added across 7 test files. All passing.
+
+### Test Infrastructure (Phase 1)
+- **Files:** `jest.config.js`, `tests/setup.js`, `tests/helpers.js`, `tests/mocks/supabase.js`, `tests/mocks/models.js`
+- Jest configured for Node environment, `tests/**/*.test.js` pattern
+- In-memory Supabase mock: full PostgREST query builder simulation (`.from().select().eq().single()`, `.insert()`, `.update()`, `.delete()`, `.overlaps()`, `.or()`, `.order()`, `.limit()`)
+- Getter-based lazy resolution for select chains; dedicated `updateBuilder` for `.update().eq().select().single()` chains
+- Mock utilities: `__setData(table, rows)`, `__getData(table)`, `__reset()`
+- Factory helpers: `makeAgent()`, `makeTeam()`, `makeProposal()`, `makeMission()`, `makeStep()`, `makePersona()`
+- Mock models.js: configurable `callLLM()`, `selectTier()`, `getModelCosts()`
+
+### Roster Injection (Phase 2) — Fix: Frasier Doesn't Know Its Agents
+- **Files modified:** `src/lib/agents.js`, `src/lib/memory.js`, `src/discord_bot.js`
+- **Tests:** 7 in `tests/phase2/roster-injection.test.js`
+- `buildRosterSection()` queries all teams + agents, formats as:
+  ```
+  ## Current Roster
+  ### Team Research [active]
+  - Gendo (Research Strategist) (Lead)
+  - Edward (Research Analyst)
+  ```
+- Injected into `buildAgentPrompt()` only for `chief_of_staff` agents (Frasier)
+- Naming convention enforced in `frasierInstructions`: "ALWAYS use Name (Role) format"
+- Excludes retired agents, shows "No agents assigned" for empty teams
+
+### Context Enrichment + Auto Tier Selection + Persona-as-Rubric (Phase 5) — Fix: Generic Deliverables
+- **Files created:** `src/lib/context.js`
+- **Files modified:** `src/lib/agents.js`, `src/lib/models.js`, `src/worker.js`, `src/heartbeat.js`
+- **Tests:** 37 across `tests/phase5/context-enrichment.test.js`, `tier-selection.test.js`, `persona-rubric.test.js`
+
+**Context Enrichment (`context.js`):**
+- `buildTaskContext(step, agentRole)` constructs rich prompts combining:
+  1. Zero's original message (traced via mission → proposal → raw_message)
+  2. Domain-specific quality mandates (role-based instructions)
+  3. Task description
+  4. Structured output template (research, strategy, content, engineering, requirements, default)
+  5. Quality standards block ("Never use filler phrases", "Always provide actionable recommendations")
+- `selectOutputTemplate(taskDescription)` — keyword-based template selection with required sections (Executive Summary, Findings, Recommendations, etc.)
+- `getDomainInstructions(agentRole)` — role-specific mandates (e.g., research must include "specific data points with sources", "TAM/SAM/SOM estimates", "risk matrix")
+
+**Persona-as-Rubric (`agents.js`):**
+- `QUALITY_RUBRICS` — Non-negotiable quality standards for: research, strategy, content, engineering, qa, marketing, knowledge
+- `buildQualityRubric(role)` — returns role-specific rubric for persona injection
+- `upgradePersonaWithRubric(agentId)` — appends `## Quality Standards (Non-Negotiable)` section to existing persona's `full_sep_prompt`
+- Rubric is part of persona = 100% retrieval (always in system prompt, unlike lessons which compete for top 5 slots)
+
+**Auto Tier Selection (`models.js` + `worker.js`):**
+- Enhanced `selectTier(isComplex, taskDescription, stepContext)` — third parameter added
+- Research/strategy/analysis/design/requirements keywords → auto-upgrade to tier2
+- Final step in multi-step mission (`stepContext.isFinalStep`) → tier2
+- `isLastStepInMission(step)` helper in worker.js queries highest step_order
+- Only overrides if step had default tier1 (respects explicit tier assignments)
+
+### Enhanced Reviews (Phase 6) — Fix: Weak Quality Gate
+- **Files modified:** `src/lib/conversations.js`, `src/worker.js`
+- **Tests:** 13 in `tests/phase6/enhanced-reviews.test.js`
+- `buildEnhancedReviewPrompt()` — structured review with:
+  - Zero's original message for context
+  - 5-criterion rubric: Relevance (1-5), Depth (1-5), Actionability (1-5), Accuracy (1-5), Executive Quality (1-5)
+  - Mandatory response format: SCORES → VERDICT ([APPROVE]/[REJECT]) → FEEDBACK
+- `parseEnhancedReview(reviewContent)` — extracts scores, verdict, feedback
+  - Auto-rejects on overall score < 3 (even if reviewer said APPROVE)
+  - Returns `{ verdict, overallScore, scores, feedback, autoRejected }`
+- Team Lead reviews use tier2; QA reviews use tier1
+- Rejection feedback includes specific revision instructions
+
+### Project Lifecycle (Phase 3) — Fix: No End-to-End Tracking
+- **Files created:** `src/lib/projects.js`, `sql/003_projects.sql`
+- **Files modified:** `src/heartbeat.js`, `src/discord_bot.js`
+- **Tests:** 15 in `tests/phase3/projects.test.js`
+
+**Database (`sql/003_projects.sql`):**
+- `projects` table: name, description, status, phase, business_id, original_message, timestamps
+- `project_missions` linking table: project_id, mission_id, phase (avoids ALTER TABLE on missions)
+- `project_context` table: phase, context_type (deliverable/decision/requirement/note), content, source references
+- Indexes on status, project_id, mission_id
+
+**Projects module (`projects.js`):**
+- Lifecycle phases: `discovery → requirements → design → build → test → deploy → completed`
+- `createProject()`, `getProject()`, `getActiveProjects()`
+- `advanceProjectPhase()` — strictly forward, no skipping/reversing
+- `linkMissionToProject()`, `getProjectMissions()` (grouped by phase)
+- `saveProjectContext()`, `getProjectContext()` — accumulate context across phases
+- `detectExistingProject(message)` — keyword overlap matching (≥2 keywords) against active projects
+- `buildProjectContextForPrompt(projectId)` — formats context for prompt injection
+- `checkPhaseCompletion(projectId)` — auto-advances phase when all missions in current phase complete
+
+**Integration:**
+- Heartbeat: after mission creation, links to detected/tagged project. After mission completion, checks phase advancement.
+- Discord bot: `[PROJECT:id]` tag support in proposal descriptions
+
+### Smart Routing + Gap-Fill Hiring (Phase 4) — Fix: No Dynamic Team Assembly
+- **Files modified:** `src/lib/agents.js`, `src/heartbeat.js`, `src/discord_bot.js`
+- **Tests:** 12 in `tests/phase4/smart-routing.test.js`
+
+**Cross-Team Agent Matching (`agents.js`):**
+- `findBestAgentAcrossTeams(roleCategory)` — searches ALL active agents across ALL teams for role match
+- `SMART_ROLE_KEYWORDS` — keyword patterns for matching (research, strategy, content, engineering, qa, marketing, knowledge)
+- Only returns active agents; respects all teams
+
+**Gap-Fill Hiring (`agents.js`):**
+- `autoHireGapAgent(roleTitle, roleCategory)` — creates agent on correct standing team with no approval needed
+- `getStandingTeamForRole(roleCategory)` — maps role to home team:
+  - research/strategy/knowledge → team-research
+  - engineering/content/qa/marketing → team-execution
+- Uses name from `name_pool` (anime characters)
+- Gap-fill agents stay on standing team permanently (available for future work)
+
+**Project Assembly (`discord_bot.js`):**
+- `[ACTION:NEW_PROJECT]` action type added to Frasier's instructions
+- Response handler: parses `[PROJECT_DETAILS]` → creates project → `determineProjectRoles()` → finds/hires agents → creates first discovery mission
+- `determineProjectRoles(description)` — keyword extraction to identify needed roles
+
+**Smart Routing in Heartbeat:**
+- Replaced default `team-research` routing with intelligent matching
+- `findBestAgentAcrossTeams()` → if no match → `autoHireGapAgent()` → if pool empty → `createHiringProposal()` (fallback)
+- Uses matched agent's actual team as target team

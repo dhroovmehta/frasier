@@ -26,6 +26,7 @@ const notion = require('./lib/notion');
 const gdrive = require('./lib/google_drive');
 const alerts = require('./lib/alerts');
 const web = require('./lib/web');
+const projects = require('./lib/projects');
 
 // ============================================================
 // DISCORD CLIENT SETUP
@@ -163,6 +164,8 @@ SYSTEM SPEED: Your team is AI-powered. Tasks complete in MINUTES, not days. Neve
 
 Always be concise, professional, and action-oriented. Reference relevant context from your memory. If Zero is referencing a past conversation, recall what you both said and build on it.
 
+AGENT NAMING: When referencing agents, ALWAYS use their name and role — e.g., "Gendo (Research Strategist)" or "Rei (Content Creator)". Never use generic labels like "the research agent" or "our content person". Check your roster for exact names and roles.
+
 CRITICAL ACTION TAGS — You MUST end EVERY response with exactly ONE of these tags:
 
 [ACTION:PROPOSAL] — USE THIS when Zero is asking for ANY work to be done. This includes: research, analysis, building, writing, creating, investigating, vetting, finding information, comparing options, making recommendations, or any request where a deliverable is expected. When in doubt, USE THIS. Your response should acknowledge the task and state who you'll route it to — the actual work happens in the pipeline AFTER the proposal is created.
@@ -178,9 +181,18 @@ PHASE 2: <description> | ROLE: <role> | TIER: <tier>
 
 Each phase will execute sequentially — phase 2 only starts after phase 1 is fully approved. Each phase automatically receives the previous phase's output as context.
 
+[ACTION:NEW_PROJECT] — USE THIS when Zero describes a major initiative that will require multiple phases and potentially multiple agents. Examples: "Build me a Real Estate AI Agent", "Launch a new product line", "Create a complete marketing strategy". Include project details:
+
+[PROJECT_DETAILS]
+NAME: <short project name>
+DESCRIPTION: <1-2 sentence description>
+[/PROJECT_DETAILS]
+
+The system will create a project with lifecycle tracking (discovery → requirements → design → build → test → deploy) and ensure the right agents are available.
+
 [ACTION:APPROVAL_NEEDED] — Use when something requires Zero's explicit approval before proceeding (e.g., spending over budget, major strategic decisions).
 
-DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL] for multi-phase requests. It is far worse to miss a task (Zero waits forever for nothing) than to create an unnecessary proposal (which is harmless).`;
+DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL] for multi-phase requests, [ACTION:NEW_PROJECT] for major initiatives. It is far worse to miss a task (Zero waits forever for nothing) than to create an unnecessary proposal (which is harmless).`;
 
   // Call LLM as Frasier — always Tier 1, Frasier is just routing/responding
   const result = await models.callLLM({
@@ -218,7 +230,85 @@ DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL]
   }
 
   // Parse the action tag
-  if (response.includes('[ACTION:MULTI_STEP_PROPOSAL]')) {
+  if (response.includes('[ACTION:NEW_PROJECT]')) {
+    // NEW PROJECT: Create a project with lifecycle tracking, determine needed roles,
+    // find/hire agents, and create the first mission.
+    const cleanResponse = response.replace(/\[ACTION:\w+\]/g, '').replace(/\[PROJECT_DETAILS\][\s\S]*?\[\/PROJECT_DETAILS\]/g, '').trim();
+
+    // Parse project details
+    const detailsMatch = response.match(/\[PROJECT_DETAILS\]([\s\S]*?)\[\/PROJECT_DETAILS\]/);
+    const nameMatch = detailsMatch && detailsMatch[1].match(/NAME:\s*(.+)/i);
+    const descMatch = detailsMatch && detailsMatch[1].match(/DESCRIPTION:\s*(.+)/i);
+
+    const projectName = nameMatch ? nameMatch[1].trim() : content.substring(0, 100);
+    const projectDesc = descMatch ? descMatch[1].trim() : content;
+
+    try {
+      // Create the project
+      const project = await projects.createProject({
+        name: projectName,
+        description: projectDesc,
+        originalMessage: content
+      });
+
+      if (project) {
+        // Determine needed roles and ensure agents exist
+        const neededRoles = agents.determineProjectRoles(projectDesc);
+        const roleStatus = [];
+
+        for (const roleCategory of neededRoles) {
+          const existing = await agents.findBestAgentAcrossTeams(roleCategory);
+          if (existing) {
+            roleStatus.push(`${existing.display_name} (${existing.role}) — ready`);
+          } else {
+            const roleTitle = missions.ROLE_TITLES[roleCategory] || roleCategory;
+            const hired = await agents.autoHireGapAgent(roleTitle, roleCategory);
+            if (hired) {
+              roleStatus.push(`${hired.display_name} (${roleTitle}) — newly hired`);
+            }
+          }
+        }
+
+        // Create first proposal for discovery phase
+        await missions.createProposal({
+          proposingAgentId: 'zero',
+          title: `[PROJECT:${project.id}] Discovery: ${projectName}`,
+          description: `[PROJECT:${project.id}] ${content}`,
+          priority: 'normal',
+          rawMessage: content
+        });
+
+        const statusLines = roleStatus.length > 0
+          ? '\n' + roleStatus.map(s => `  - ${s}`).join('\n')
+          : '';
+
+        await sendSplit(message.channel,
+          cleanResponse +
+          `\n\n*Project "${projectName}" created (ID: #${project.id}). Lifecycle tracking active.*` +
+          (statusLines ? `\n*Team:${statusLines}*` : '') +
+          '\n*Discovery phase mission created. Team will start shortly.*'
+        );
+      } else {
+        await sendSplit(message.channel, cleanResponse + '\n\n*Failed to create project. Mission proposal created as fallback.*');
+        await missions.createProposal({
+          proposingAgentId: 'zero',
+          title: content.substring(0, 200),
+          description: content,
+          rawMessage: content
+        });
+      }
+    } catch (err) {
+      console.error(`[discord] Project creation failed:`, err.message);
+      await sendSplit(message.channel, cleanResponse + '\n\n*Mission proposal created.*');
+      await missions.createProposal({
+        proposingAgentId: 'zero',
+        title: content.substring(0, 200),
+        description: content,
+        rawMessage: content
+      });
+    }
+
+  } else if (response.includes('[ACTION:MULTI_STEP_PROPOSAL]')) {
     // Multi-phase mission — include the [PHASES] block in the proposal description
     // so heartbeat can parse it downstream and create chained steps
     const cleanResponse = response.replace(/\[ACTION:\w+\]/g, '').trim();

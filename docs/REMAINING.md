@@ -1,7 +1,11 @@
 # Frasier — Remaining Features
 
-> Last updated: Feb 11, 2026
+> Last updated: Feb 17, 2026
 > Priority: ranked by impact on "agents feel alive" goal
+>
+> **Note (Feb 17):** The System Overhaul fixed 4 critical failures that were NOT previously listed here:
+> roster injection, context enrichment + persona-as-rubric, project lifecycle, smart routing + gap-fill hiring.
+> See `COMPLETED.md` for full details. The items below remain outstanding.
 
 ---
 
@@ -71,8 +75,8 @@
 
 ### 6. Policy Engine Integration
 - **Impact:** LOW — framework exists, just not widely used
-- **What exists:** Policy table, authorization functions, Tier 3 check works
-- **What's needed:**
+- **What exists:** Policy table, authorization functions, Tier 3 check works. Auto tier selection (Feb 17 overhaul) now ensures research/strategy/final steps use tier2 automatically.
+- **What's still needed:**
   - Agents check policy before executing actions that have cost implications
   - Spending limits enforced at task assignment time (not just Tier 3)
   - Policy violations logged as events
@@ -185,25 +189,27 @@
 
 ## Build Order Recommendation
 
-**Phase 1 — Make agents social (next session):**
+> System Overhaul (Feb 17) is complete. The following phases are for remaining work.
+
+**Next — Make agents social:**
 1. Conversation scheduling (10-15/day)
 2. Affinity matrix
 3. Watercooler conversations
 
-**Phase 2 — Quick wins:**
+**Then — Quick wins:**
 4. Standup publishing
 5. Missing founder commands
 
-**Phase 3 — Agent personality:**
+**Then — Agent personality:**
 6. Speaking style drift
 7. Debate + mentoring conversations
 
-**Phase 4 — Frontend (multi-session):**
+**Then — Frontend (multi-session):**
 8. Next.js pixel-art office
 9. Real-time subscriptions
 10. Dashboard panels
 
-**Phase 5 — Polish:**
+**Finally — Polish:**
 11. Policy integration
 12. Multi-business runtime
 13. Ad-hoc messaging

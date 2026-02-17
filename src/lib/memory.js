@@ -447,11 +447,23 @@ async function buildAgentPrompt(agentId, topicTags = []) {
   const skillsSection = skills.formatSkillsForPrompt(agentSkills);
 
   const promptParts = [
-    personaData.systemPrompt,
-    '\n---\n',
-    '# YOUR MEMORY (What you remember from past experience)',
-    memories.formatted
+    personaData.systemPrompt
   ];
+
+  // For Frasier (chief_of_staff): inject the full roster so they know who to route tasks to.
+  // WHY: Without this, Frasier has no idea which agents exist or what their names are.
+  // The roster is injected between persona and memory so it's always visible.
+  if (personaData.agent && personaData.agent.agent_type === 'chief_of_staff') {
+    const agentsModule = require('./agents');
+    const rosterSection = await agentsModule.buildRosterSection();
+    promptParts.push('\n---\n');
+    promptParts.push(rosterSection);
+    promptParts.push('\nWhen referencing agents, ALWAYS use their name and role: e.g., "Gendo (Research Strategist)". Never use generic labels like "the research agent".');
+  }
+
+  promptParts.push('\n---\n');
+  promptParts.push('# YOUR MEMORY (What you remember from past experience)');
+  promptParts.push(memories.formatted);
 
   // Only add skills section if agent has developed skills (backwards-compatible)
   if (skillsSection) {

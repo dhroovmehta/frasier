@@ -24,6 +24,7 @@ const health = require('./lib/health');
 const gdrive = require('./lib/google_drive');
 const github = require('./lib/github');
 const notion = require('./lib/notion');
+const projects = require('./lib/projects');
 
 const POLL_INTERVAL_MS = 30 * 1000; // 30 seconds
 const HEALTH_PORT = process.env.HEALTH_PORT || 8787;
@@ -114,8 +115,45 @@ async function processProposals() {
 
   for (const proposal of proposals) {
     try {
-      // Determine target team
-      const teamId = proposal.assigned_team_id || 'team-research'; // Default to research team
+      // SMART ROUTING: Determine best role and find an agent across ALL teams.
+      // WHY: Old routing defaulted everything to team-research. Now we search
+      // all active agents for the best match, and auto-hire if nobody qualifies.
+      const taskDescription = proposal.description || proposal.title;
+      const bestRole = missions.routeByKeywords(taskDescription);
+
+      // Step 1: Try to find an agent across all teams
+      let matchedAgent = await agents.findBestAgentAcrossTeams(bestRole);
+
+      // Step 2: If no match, try to auto-hire a gap agent
+      if (!matchedAgent) {
+        const roleTitle = missions.ROLE_TITLES[bestRole] || bestRole;
+        console.log(`[heartbeat] No ${roleTitle} found anywhere. Auto-hiring for proposal #${proposal.id}.`);
+
+        matchedAgent = await agents.autoHireGapAgent(roleTitle, bestRole);
+
+        if (matchedAgent) {
+          await events.logEvent({
+            eventType: 'agent_auto_hired',
+            agentId: matchedAgent.id,
+            severity: 'info',
+            description: `Auto-hired ${matchedAgent.display_name} (${roleTitle}) for ${matchedAgent.team_id}`,
+            data: { proposalId: proposal.id, role: roleTitle }
+          });
+        } else {
+          // Auto-hire failed (name pool empty) — fall back to hiring proposal
+          await agents.createHiringProposal({
+            role: roleTitle,
+            teamId: agents.getStandingTeamForRole(bestRole),
+            justification: `Task "${proposal.title}" requires a ${roleTitle}. Auto-hire failed (name pool may be exhausted).`,
+            triggeringProposalId: proposal.id
+          });
+          await deferProposal(proposal.id);
+          continue;
+        }
+      }
+
+      // Use the matched agent's team as the target team
+      const teamId = matchedAgent.team_id;
 
       // Check team is active
       const team = await agents.getTeam(teamId);
@@ -124,45 +162,38 @@ async function processProposals() {
         continue;
       }
 
-      // Get team agents for assignment
+      // Get team agents for multi-step mission routing
       const teamAgents = await agents.getTeamAgents(teamId);
-
-      // Route task to best-fit role category
-      const taskDescription = proposal.description || proposal.title;
-      const bestRole = missions.routeByKeywords(taskDescription);
-
-      // GAP DETECTION: check if the team can actually handle this role
-      const { canHandle, matchedAgent } = missions.canTeamHandle(teamAgents, bestRole);
-
-      if (!canHandle) {
-        // No agent can handle this role — propose a hire
-        const roleTitle = missions.ROLE_TITLES[bestRole] || bestRole;
-        console.log(`[heartbeat] No ${roleTitle} on team ${teamId}. Proposing hire for proposal #${proposal.id}.`);
-
-        await agents.createHiringProposal({
-          role: roleTitle,
-          teamId,
-          justification: `Task "${proposal.title}" requires a ${roleTitle}, but no agent with that role exists on ${teamId}.`,
-          triggeringProposalId: proposal.id
-        });
-
-        // Defer the proposal — prevents heartbeat from re-processing it every tick
-        await deferProposal(proposal.id);
-
-        await events.logEvent({
-          eventType: 'hiring_proposed',
-          teamId,
-          severity: 'info',
-          description: `Hiring proposal created for ${roleTitle} on ${teamId} (triggered by proposal #${proposal.id})`,
-          data: { proposalId: proposal.id, role: roleTitle }
-        });
-
-        continue;
-      }
 
       // Normal flow: accept proposal and create mission
       const mission = await missions.acceptProposal(proposal.id, teamId);
       if (!mission) continue;
+
+      // PROJECT LINKING: Check if this mission relates to an existing project.
+      // If proposal description has [PROJECT:id], use explicit link.
+      // Otherwise, auto-detect via keyword matching against active projects.
+      let linkedProjectId = null;
+      try {
+        const projectTagMatch = (taskDescription || '').match(/\[PROJECT:(\d+)\]/);
+        if (projectTagMatch) {
+          linkedProjectId = parseInt(projectTagMatch[1]);
+        } else {
+          const matchedProject = await projects.detectExistingProject(taskDescription);
+          if (matchedProject) {
+            linkedProjectId = matchedProject.id;
+          }
+        }
+
+        if (linkedProjectId) {
+          const project = await projects.getProject(linkedProjectId);
+          if (project) {
+            await projects.linkMissionToProject(linkedProjectId, mission.id, project.phase);
+            console.log(`[heartbeat] Mission #${mission.id} linked to project #${linkedProjectId} (phase: ${project.phase})`);
+          }
+        }
+      } catch (err) {
+        console.error(`[heartbeat] Project linking failed for mission #${mission.id}:`, err.message);
+      }
 
       // Check for multi-phase request: [PHASES] block in description
       const phases = missions.parsePhases(taskDescription);
@@ -594,6 +625,33 @@ async function checkMissions() {
         description: `Mission #${mission.id}: "${mission.title}" completed`,
         data: { missionId: mission.id }
       });
+
+      // PROJECT PHASE CHECK: If this mission is linked to a project,
+      // check if all missions in the current phase are now complete.
+      // If so, auto-advance the project to the next lifecycle phase.
+      try {
+        const { data: projectLink } = await require('./lib/supabase')
+          .from('project_missions')
+          .select('project_id')
+          .eq('mission_id', mission.id)
+          .maybeSingle();
+
+        if (projectLink) {
+          const advanced = await projects.checkPhaseCompletion(projectLink.project_id);
+          if (advanced) {
+            const project = await projects.getProject(projectLink.project_id);
+            console.log(`[heartbeat] Project #${projectLink.project_id} advanced to phase: ${project.phase}`);
+            await events.logEvent({
+              eventType: 'project_phase_advanced',
+              severity: 'info',
+              description: `Project "${project.name}" advanced to ${project.phase} phase`,
+              data: { projectId: project.id, phase: project.phase }
+            });
+          }
+        }
+      } catch (err) {
+        console.error(`[heartbeat] Project phase check failed:`, err.message);
+      }
     }
   }
 }

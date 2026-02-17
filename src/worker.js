@@ -17,6 +17,7 @@ const skills = require('./lib/skills');
 const web = require('./lib/web');
 const social = require('./lib/social');
 const agents = require('./lib/agents');
+const context = require('./lib/context');
 const supabase = require('./lib/supabase');
 
 const POLL_INTERVAL_MS = 10 * 1000; // 10 seconds
@@ -84,25 +85,46 @@ async function processNextStep() {
     // not the URL string. Twitter/X URLs get rewritten to fxtwitter for access.
     const { enrichedText } = await web.prefetchUrls(step.description);
 
+    // Get the agent's role for context enrichment
+    const agent = await agents.getAgent(step.assigned_agent_id);
+    const agentRole = agent ? agent.role : 'General';
+
+    // CONTEXT ENRICHMENT: Build rich task context with Zero's original request,
+    // domain-specific quality mandates, output templates, and quality standards.
+    // This replaces raw task description with a structured, role-aware prompt.
+    const enrichedStep = { ...step, description: enrichedText };
+    let userMessage = await context.buildTaskContext(enrichedStep, agentRole);
+
     // CHAIN CONTEXT: If this step has a parent, inject the parent's result
     // so the agent builds on the previous phase's output.
-    let userMessage = enrichedText;
     if (step.parent_step_id) {
       const parentData = await missions.getParentStepResult(step.parent_step_id);
       if (parentData) {
         const truncatedResult = parentData.result.substring(0, 6000);
-        userMessage = `## PREVIOUS PHASE OUTPUT (from ${parentData.agentName})\nThe following is the completed output from the previous phase. Use it as foundation:\n---\n${truncatedResult}\n---\n\n${enrichedText}`;
+        userMessage = `## PREVIOUS PHASE OUTPUT (from ${parentData.agentName})\nThe following is the completed output from the previous phase. Use it as foundation:\n---\n${truncatedResult}\n---\n\n${userMessage}`;
         console.log(`[worker] Step #${step.id}: Injected parent step #${step.parent_step_id} context (${truncatedResult.length} chars)`);
       }
     }
 
-    // Call the LLM — always respect the step's assigned tier
+    // AUTO TIER SELECTION: Upgrade tier based on task complexity if step uses default tier.
+    // Only override if step was assigned tier1 (the default) — explicit tier2/tier3 assignments are respected.
+    let effectiveTier = step.model_tier;
+    if (step.model_tier === 'tier1') {
+      const isFinalStep = await isLastStepInMission(step);
+      const autoTier = models.selectTier(false, step.description, { isFinalStep });
+      if (autoTier === 'tier2') {
+        effectiveTier = 'tier2';
+        console.log(`[worker] Step #${step.id}: Auto-upgraded to tier2 (${isFinalStep ? 'final step' : 'complex task'})`);
+      }
+    }
+
+    // Call the LLM with enriched context and potentially upgraded tier
     const result = await models.callLLM({
       systemPrompt: promptData.systemPrompt,
       userMessage,
       agentId: step.assigned_agent_id,
       missionStepId: step.id,
-      forceTier: step.model_tier
+      forceTier: effectiveTier
     });
 
     if (result.error) {
@@ -242,18 +264,24 @@ async function processNextReview() {
       .eq('id', step.assigned_agent_id)
       .single();
 
-    const reviewPrompt = conversations.buildReviewPrompt(
+    // ENHANCED REVIEW: Inject Zero's original request and use rubric-based scoring.
+    // WHY: Old reviews were shallow pass/fail. New reviews score 5 criteria and
+    // auto-reject on low scores, even if the reviewer says "approve".
+    const originalMessage = await context.getOriginalMessage(step.mission_id);
+    const reviewPrompt = conversations.buildEnhancedReviewPrompt(
       author?.display_name || step.assigned_agent_id,
       step.result,
-      step.description
+      step.description,
+      originalMessage
     );
 
-    // Call LLM for the review — always tier1
+    // Team Lead reviews use tier2 for better quality judgment; QA uses tier1
+    const reviewTier = approval.review_type === 'team_lead' ? 'tier2' : 'tier1';
     const result = await models.callLLM({
       systemPrompt: promptData.systemPrompt,
       userMessage: reviewPrompt,
       agentId: approval.reviewer_agent_id,
-      forceTier: 'tier1'
+      forceTier: reviewTier
     });
 
     if (result.error) {
@@ -263,10 +291,13 @@ async function processNextReview() {
       return;
     }
 
-    // Parse the review response — look for approval/rejection signals
-    const reviewContent = result.content.toLowerCase();
-    const isApproved = reviewContent.includes('approve') && !reviewContent.includes('not approve') && !reviewContent.includes('do not approve');
-    const isRejected = reviewContent.includes('reject') || reviewContent.includes('send back') || reviewContent.includes('revision needed') || reviewContent.includes('not ready');
+    // Parse the structured review — extracts scores, verdict, and feedback
+    const parsedReview = conversations.parseEnhancedReview(result.content);
+    const isRejected = parsedReview.verdict === 'reject';
+
+    if (parsedReview.autoRejected) {
+      console.log(`[worker] Review #${approval.id}: Auto-rejected (overall score ${parsedReview.overallScore}/5 < 3)`);
+    }
 
     if (isRejected) {
       // Rejected — send back for revision
@@ -591,6 +622,26 @@ ${expertiseAddition}`;
 // ============================================================
 // HELPERS
 // ============================================================
+
+/**
+ * Check if a step is the last (highest step_order) in its mission.
+ * Used for auto tier selection — final deliverables get tier2 for quality.
+ */
+async function isLastStepInMission(step) {
+  if (!step.mission_id) return false;
+
+  const { data: steps } = await supabase
+    .from('mission_steps')
+    .select('step_order')
+    .eq('mission_id', step.mission_id)
+    .order('step_order', { ascending: false })
+    .limit(1);
+
+  if (!steps || steps.length === 0) return true;
+
+  // This step is the last if its step_order matches the highest
+  return step.step_order >= (steps[0].step_order || 0);
+}
 
 function extractTopicTags(description) {
   const lower = description.toLowerCase();

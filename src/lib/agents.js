@@ -642,6 +642,324 @@ async function getNamePoolStats() {
   return stats;
 }
 
+// ============================================================
+// ROSTER (formatted team/agent summary for prompt injection)
+// ============================================================
+
+/**
+ * Build a formatted roster section for injection into Frasier's prompt.
+ * Lists all active agents grouped by team with "Name (Role)" format.
+ * WHY: Frasier needs to know who's on each team to route tasks correctly
+ * and reference agents by name. Without this, Frasier has no idea who exists.
+ *
+ * @returns {string} Formatted roster markdown section
+ */
+async function buildRosterSection() {
+  const teams = await getAllTeams();
+  const lines = ['## Current Roster'];
+
+  for (const team of teams) {
+    const teamAgents = await getTeamAgents(team.id);
+    lines.push(`\n### ${team.name} [${team.status}]`);
+
+    if (teamAgents.length === 0) {
+      lines.push('- No agents assigned');
+      continue;
+    }
+
+    for (const agent of teamAgents) {
+      const typeTag = agent.agent_type === 'team_lead' ? ' (Lead)' :
+        agent.agent_type === 'qa' ? ' (QA)' : '';
+      lines.push(`- ${agent.display_name} (${agent.role})${typeTag}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ============================================================
+// QUALITY RUBRIC (persona-as-rubric for enforcing output quality)
+// ============================================================
+
+// Role-specific quality rubrics appended to personas.
+// WHY in persona instead of lessons: persona is ALWAYS in the system prompt (100% retrieval).
+// Lessons compete for top 5 slots. Quality standards must never be optional.
+const QUALITY_RUBRICS = {
+  research: `## Quality Standards (Non-Negotiable)
+- You NEVER deliver research without: named sources, specific data points, quantified estimates
+- You NEVER make claims without evidence or clear reasoning
+- You NEVER use filler phrases like "in today's fast-paced world" or "it's important to note that"
+- You ALWAYS include a Risk Assessment section with probability and impact ratings
+- You ALWAYS provide at least 3 specific, actionable recommendations
+- If you lack data, you STATE what's missing rather than filling with generic text
+- Every competitor mentioned includes at least one differentiating data point`,
+
+  strategy: `## Quality Standards (Non-Negotiable)
+- You NEVER deliver strategy without quantified projections and measurable outcomes
+- You NEVER present a plan without a 90-day implementation roadmap with milestones
+- You NEVER skip resource requirements — budget, tools, and people with specific estimates
+- You ALWAYS include success metrics with specific KPI targets and timeframes
+- You ALWAYS include risk mitigation for the top 3 risks
+- If you lack data for projections, you STATE assumptions explicitly
+- Every recommendation includes expected ROI or measurable impact`,
+
+  content: `## Quality Standards (Non-Negotiable)
+- You NEVER publish content without a hook that passes the "would I click this?" test
+- You NEVER use generic marketing speak — every sentence must be audience-specific
+- You NEVER make claims without backing them with a data point or real example
+- You ALWAYS include a clear CTA with measurable expected outcome
+- You ALWAYS recommend 2-3 distribution channels with rationale
+- If content lacks depth, you research more rather than padding with filler`,
+
+  engineering: `## Quality Standards (Non-Negotiable)
+- You NEVER deliver code without error handling at every external boundary
+- You NEVER skip test cases for happy path, edge cases, and error scenarios
+- You NEVER write pseudocode when working code is expected
+- You ALWAYS include inline comments explaining WHY, not WHAT
+- You ALWAYS include deployment instructions and rollback plan
+- You handle null/undefined defensively at all system boundaries`,
+
+  qa: `## Quality Standards (Non-Negotiable)
+- You NEVER approve deliverables without verifying specific pass/fail criteria
+- You NEVER skip edge cases and boundary conditions in your review
+- You ALWAYS check for security implications and flag them
+- You ALWAYS provide specific, actionable feedback — not vague "needs improvement"
+- You ALWAYS include a clear APPROVE or REJECT verdict with evidence
+- Your reviews reference specific sections of the deliverable, not generalities`,
+
+  marketing: `## Quality Standards (Non-Negotiable)
+- You NEVER deliver marketing plans without channel-specific conversion rate estimates
+- You NEVER skip budget allocation or ROI projections
+- You ALWAYS include A/B test recommendations with success criteria
+- You ALWAYS include competitive positioning analysis
+- You ALWAYS provide a 30/60/90 day implementation timeline
+- Every tactic includes expected measurable outcomes`,
+
+  knowledge: `## Quality Standards (Non-Negotiable)
+- You NEVER deliver documentation without clear categorization and tagging
+- You NEVER skip cross-references to related documents
+- You ALWAYS include a summary of key insights, not just raw data
+- You ALWAYS identify gaps in existing knowledge
+- You ALWAYS recommend next steps for knowledge improvement`,
+
+  default: `## Quality Standards (Non-Negotiable)
+- You NEVER deliver work without specific evidence, data, or clear reasoning
+- You NEVER use filler phrases or AI slop — every sentence must add value
+- You NEVER make vague claims like "significant growth" — use specific numbers
+- You ALWAYS structure output with clear sections and headings
+- You ALWAYS provide actionable recommendations
+- If you lack information, you STATE what's missing rather than filling with generic text`
+};
+
+// Map roles to rubric categories (same mapping as context.js ROLE_TO_DOMAIN)
+const ROLE_TO_RUBRIC = {
+  'research analyst': 'research',
+  'research': 'research',
+  'analyst': 'research',
+  'strategy lead': 'strategy',
+  'strategist': 'strategy',
+  'strategy': 'strategy',
+  'content creator': 'content',
+  'content writer': 'content',
+  'copywriter': 'content',
+  'content': 'content',
+  'full-stack engineer': 'engineering',
+  'engineer': 'engineering',
+  'developer': 'engineering',
+  'engineering': 'engineering',
+  'qa engineer': 'qa',
+  'qa': 'qa',
+  'quality assurance': 'qa',
+  'tester': 'qa',
+  'growth marketer': 'marketing',
+  'marketing': 'marketing',
+  'knowledge curator': 'knowledge',
+  'knowledge': 'knowledge'
+};
+
+/**
+ * Build a quality rubric for a given agent role.
+ * This gets appended to the agent's persona (system prompt) so it's always present.
+ *
+ * @param {string} role - Agent's role string (e.g. "Research Analyst")
+ * @returns {string} Quality rubric markdown section
+ */
+function buildQualityRubric(role) {
+  const lower = (role || '').toLowerCase();
+
+  // Try exact match
+  if (ROLE_TO_RUBRIC[lower]) {
+    return QUALITY_RUBRICS[ROLE_TO_RUBRIC[lower]];
+  }
+
+  // Try partial match
+  for (const [roleKey, rubricKey] of Object.entries(ROLE_TO_RUBRIC)) {
+    if (lower.includes(roleKey) || roleKey.includes(lower)) {
+      return QUALITY_RUBRICS[rubricKey];
+    }
+  }
+
+  return QUALITY_RUBRICS.default;
+}
+
+/**
+ * Upgrade an existing agent's persona with a quality rubric.
+ * Reads current persona, appends rubric, saves as new persona version.
+ * No-op if rubric already present.
+ *
+ * @param {string} agentId
+ * @returns {Object|null} New persona if upgraded, null if already has rubric or error
+ */
+async function upgradePersonaWithRubric(agentId) {
+  // Get agent and current persona
+  const agent = await getAgent(agentId);
+  if (!agent || !agent.persona_id) return null;
+
+  const { data: persona } = await supabase
+    .from('agent_personas')
+    .select('*')
+    .eq('id', agent.persona_id)
+    .single();
+
+  if (!persona || !persona.full_sep_prompt) return null;
+
+  // Skip if already has a quality rubric
+  if (persona.full_sep_prompt.includes('Quality Standards (Non-Negotiable)')) {
+    return null;
+  }
+
+  // Build and append rubric
+  const rubric = buildQualityRubric(agent.role);
+  const upgradedPrompt = persona.full_sep_prompt + '\n\n' + rubric;
+
+  // Save as new persona version (preserves old one as history)
+  const newPersona = await savePersona({
+    agentId,
+    agentMd: persona.agent_md,
+    soulMd: persona.soul_md,
+    skillsMd: persona.skills_md,
+    identityMd: persona.identity_md,
+    fullSepPrompt: upgradedPrompt
+  });
+
+  return newPersona;
+}
+
+// ============================================================
+// SMART ROUTING (cross-team agent matching)
+// ============================================================
+
+// Keywords for matching agents to role categories
+const SMART_ROLE_KEYWORDS = {
+  research: ['research', 'analyst', 'intelligence', 'data'],
+  strategy: ['strategy', 'lead', 'strategist', 'business'],
+  content: ['content', 'writer', 'creator', 'copywriter', 'copy'],
+  engineering: ['engineer', 'developer', 'architect', 'full-stack'],
+  qa: ['qa', 'quality', 'tester', 'testing'],
+  marketing: ['marketing', 'growth', 'seo', 'marketer'],
+  knowledge: ['knowledge', 'documentation', 'curator', 'wiki']
+};
+
+// Maps role categories to standing teams
+const ROLE_TO_TEAM = {
+  research: 'team-research',
+  strategy: 'team-research',
+  knowledge: 'team-research',
+  engineering: 'team-execution',
+  content: 'team-execution',
+  qa: 'team-execution',
+  marketing: 'team-execution'
+};
+
+/**
+ * Find the best agent across ALL teams for a given role category.
+ * WHY: Previous routing only looked at the target team. If a research agent
+ * exists on team-research but the proposal targets team-execution, it was missed.
+ *
+ * @param {string} roleCategory - e.g. 'research', 'content', 'engineering'
+ * @returns {Object|null} Best matching agent, or null
+ */
+async function findBestAgentAcrossTeams(roleCategory) {
+  const allAgents = await getAllActiveAgents();
+  const keywords = SMART_ROLE_KEYWORDS[roleCategory] || [];
+
+  for (const agent of allAgents) {
+    const agentRole = (agent.role || '').toLowerCase();
+    if (keywords.some(kw => agentRole.includes(kw))) {
+      return agent;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get the standing team for a role category.
+ * @param {string} roleCategory
+ * @returns {string} Team ID
+ */
+function getStandingTeamForRole(roleCategory) {
+  return ROLE_TO_TEAM[roleCategory] || 'team-research';
+}
+
+/**
+ * Auto-hire a gap agent for a missing role.
+ * Creates the agent on the correct standing team with no approval needed.
+ *
+ * @param {string} roleTitle - Human-readable role (e.g. "Content Creator")
+ * @param {string} roleCategory - Category key (e.g. "content")
+ * @returns {Object|null} Created agent, or null on failure
+ */
+async function autoHireGapAgent(roleTitle, roleCategory) {
+  const teamId = getStandingTeamForRole(roleCategory);
+
+  const agent = await createAgent({
+    role: roleTitle,
+    teamId,
+    agentType: 'sub_agent'
+  });
+
+  if (agent) {
+    console.log(`[agents] Gap-fill agent ${agent.display_name} (${roleTitle}) auto-hired for ${teamId}`);
+  }
+
+  return agent;
+}
+
+/**
+ * Determine which roles are needed for a project based on its description.
+ * Returns an array of role category keys (e.g. ['research', 'engineering', 'content']).
+ *
+ * @param {string} description - Project description
+ * @returns {string[]} Array of role categories needed
+ */
+function determineProjectRoles(description) {
+  const lower = (description || '').toLowerCase();
+  const roles = new Set();
+
+  // Use missions.EXPERTISE_MAP style keyword matching
+  const EXPERTISE_KEYWORDS = {
+    research: ['research', 'analysis', 'market', 'competitive', 'trends', 'intelligence', 'data', 'report', 'analyze'],
+    strategy: ['strategy', 'business plan', 'roadmap', 'pricing', 'financial', 'revenue', 'growth plan'],
+    content: ['content', 'copywriting', 'blog', 'social media', 'tweet', 'post', 'brand', 'write', 'article'],
+    engineering: ['code', 'build', 'api', 'deploy', 'architecture', 'database', 'backend', 'frontend'],
+    qa: ['test', 'quality', 'review', 'audit', 'security'],
+    marketing: ['seo', 'distribution', 'funnel', 'ads', 'campaign', 'conversion', 'marketing'],
+    knowledge: ['document', 'summarize', 'knowledge', 'wiki', 'organize']
+  };
+
+  for (const [role, keywords] of Object.entries(EXPERTISE_KEYWORDS)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      roles.add(role);
+    }
+  }
+
+  // Default: at least research
+  if (roles.size === 0) roles.add('research');
+
+  return Array.from(roles);
+}
+
 module.exports = {
   // Agent lifecycle
   createAgent,
@@ -670,5 +988,15 @@ module.exports = {
   getHiringProposal,
   getAllHiringProposals,
   // Name pool
-  getNamePoolStats
+  getNamePoolStats,
+  // Roster
+  buildRosterSection,
+  // Quality rubrics
+  buildQualityRubric,
+  upgradePersonaWithRubric,
+  // Smart routing
+  findBestAgentAcrossTeams,
+  getStandingTeamForRole,
+  autoHireGapAgent,
+  determineProjectRoles
 };

@@ -7,11 +7,15 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --forceExit --detectOpenHandles",
+    "test:watch": "jest --watch --forceExit"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
     "discord.js": "^14.25.1",

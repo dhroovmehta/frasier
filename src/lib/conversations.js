@@ -240,6 +240,130 @@ async function getTeamConversations(teamId, limit = 20) {
   return data || [];
 }
 
+// ============================================================
+// ENHANCED REVIEW SYSTEM (rubric-based scoring)
+// ============================================================
+
+/**
+ * Build an enhanced review prompt with 5-criterion rubric scoring.
+ * WHY: The old buildReviewPrompt() was too generic — reviewers gave shallow
+ * pass/fail with no structure. This forces specific scores and evidence.
+ *
+ * @param {string} authorAgentName - Who wrote the deliverable
+ * @param {string} deliverable - The work product to review
+ * @param {string} taskDescription - What the task was
+ * @param {string|null} originalMessage - Zero's original request (optional)
+ * @returns {string} Structured review prompt
+ */
+function buildEnhancedReviewPrompt(authorAgentName, deliverable, taskDescription, originalMessage = null) {
+  const parts = [];
+
+  if (originalMessage) {
+    parts.push(`## ZERO'S ORIGINAL REQUEST
+"${originalMessage}"
+`);
+  }
+
+  parts.push(`## TASK ASSIGNED
+${taskDescription}
+
+## DELIVERABLE FROM ${authorAgentName}
+${deliverable}
+
+## REVIEW INSTRUCTIONS
+Score this deliverable on 5 criteria, each 1-5:
+
+**Relevance** (1-5): Does it directly address what was asked? Does it answer the actual question/task?
+**Depth** (1-5): Does it show genuine domain expertise? Specific data, named sources, quantified claims — not surface-level generalities?
+**Actionability** (1-5): Can a senior leader act on this immediately? Are recommendations specific with expected outcomes?
+**Accuracy** (1-5): Are facts, data, and claims verifiable? Are assumptions stated explicitly?
+**Executive Quality** (1-5): Is it well-structured, professional, and free of filler/AI slop? Would you send this to a client?
+
+## REQUIRED RESPONSE FORMAT
+
+### SCORES
+- Relevance: X/5
+- Depth: X/5
+- Actionability: X/5
+- Accuracy: X/5
+- Executive Quality: X/5
+- Overall: X/5
+
+### VERDICT
+[APPROVE] or [REJECT]
+
+### FEEDBACK
+(If approving: what was done well, any minor suggestions)
+(If rejecting: SPECIFIC issues that must be fixed. Reference exact sections. Include what's missing and what "good" looks like for each issue.)
+
+IMPORTANT: A score below 3 in ANY criterion should result in [REJECT]. Generic filler, vague claims without data, or surface-level analysis are automatic rejections.`);
+
+  return parts.join('\n');
+}
+
+/**
+ * Parse a structured enhanced review response.
+ * Extracts scores, verdict, and feedback. Auto-rejects on low scores.
+ *
+ * @param {string} reviewContent - Raw LLM review output
+ * @returns {Object} { verdict, overallScore, scores, feedback, autoRejected }
+ */
+function parseEnhancedReview(reviewContent) {
+  const result = {
+    verdict: 'approve',
+    overallScore: 3,
+    scores: {},
+    feedback: '',
+    autoRejected: false
+  };
+
+  // Parse individual scores
+  const scorePatterns = {
+    relevance: /Relevance:\s*(\d+(?:\.\d+)?)/i,
+    depth: /Depth:\s*(\d+(?:\.\d+)?)/i,
+    actionability: /Actionability:\s*(\d+(?:\.\d+)?)/i,
+    accuracy: /Accuracy:\s*(\d+(?:\.\d+)?)/i,
+    executiveQuality: /Executive Quality:\s*(\d+(?:\.\d+)?)/i
+  };
+
+  for (const [key, pattern] of Object.entries(scorePatterns)) {
+    const match = reviewContent.match(pattern);
+    if (match) {
+      result.scores[key] = parseFloat(match[1]);
+    }
+  }
+
+  // Parse overall score
+  const overallMatch = reviewContent.match(/Overall:\s*(\d+(?:\.\d+)?)/i);
+  if (overallMatch) {
+    result.overallScore = parseFloat(overallMatch[1]);
+  }
+
+  // Parse verdict
+  if (reviewContent.includes('[REJECT]')) {
+    result.verdict = 'reject';
+  } else if (reviewContent.includes('[APPROVE]')) {
+    result.verdict = 'approve';
+  }
+  // If neither tag found, default remains 'approve'
+
+  // Parse feedback (everything after FEEDBACK header, or the whole thing)
+  const feedbackMatch = reviewContent.match(/(?:###?\s*)?FEEDBACK\s*\n([\s\S]*?)$/i);
+  if (feedbackMatch) {
+    result.feedback = feedbackMatch[1].trim();
+  } else {
+    result.feedback = reviewContent.trim();
+  }
+
+  // AUTO-REJECT: If overall score < 3, override verdict to reject
+  if (result.overallScore < 3 && result.verdict === 'approve') {
+    result.verdict = 'reject';
+    result.autoRejected = true;
+  }
+
+  return result;
+}
+
 module.exports = {
   CONVERSATION_TYPES,
   startConversation,
@@ -251,5 +375,8 @@ module.exports = {
   buildReviewPrompt,
   buildDelegationPrompt,
   getAgentConversations,
-  getTeamConversations
+  getTeamConversations,
+  // Enhanced reviews
+  buildEnhancedReviewPrompt,
+  parseEnhancedReview
 };
