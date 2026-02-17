@@ -292,7 +292,7 @@ DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL]
         await sendSplit(message.channel, cleanResponse + '\n\n*Failed to create project. Mission proposal created as fallback.*');
         await missions.createProposal({
           proposingAgentId: 'zero',
-          title: content.substring(0, 200),
+          title: cleanProposalTitle(content),
           description: content,
           rawMessage: content
         });
@@ -302,7 +302,7 @@ DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL]
       await sendSplit(message.channel, cleanResponse + '\n\n*Mission proposal created.*');
       await missions.createProposal({
         proposingAgentId: 'zero',
-        title: content.substring(0, 200),
+        title: cleanProposalTitle(content),
         description: content,
         rawMessage: content
       });
@@ -324,7 +324,7 @@ DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL]
 
     await missions.createProposal({
       proposingAgentId: 'zero',
-      title: content.substring(0, 200),
+      title: cleanProposalTitle(content),
       description,
       priority: content.toLowerCase().includes('urgent') ? 'urgent' : 'normal',
       rawMessage: content
@@ -340,7 +340,7 @@ DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL]
     const cleanResponse = response.replace(/\[ACTION:\w+\]/g, '').trim();
     await missions.createProposal({
       proposingAgentId: 'zero',
-      title: content.substring(0, 200),
+      title: cleanProposalTitle(content),
       description: content,
       priority: content.toLowerCase().includes('urgent') ? 'urgent' : 'normal',
       rawMessage: content
@@ -700,24 +700,7 @@ async function announceCompletedSteps() {
     console.error('[discord] announceCompletedSteps query error:', error.message || error);
     return;
   }
-  if (!steps || steps.length === 0) {
-    // DEBUG: Check what steps actually exist to diagnose why none are unannounced
-    const { data: allCompleted } = await supabase
-      .from('mission_steps')
-      .select('id, status, announced')
-      .eq('status', 'completed')
-      .limit(5);
-    const { data: anyPending } = await supabase
-      .from('mission_steps')
-      .select('id, status, announced')
-      .neq('status', 'completed')
-      .limit(5);
-    console.log(`[discord] No unannounced completed steps. Completed steps sample:`, JSON.stringify(allCompleted));
-    console.log(`[discord] Non-completed steps sample:`, JSON.stringify(anyPending));
-    return;
-  }
-
-  console.log(`[discord] Found ${steps.length} completed steps to announce`);
+  if (!steps || steps.length === 0) return;
 
   for (const step of steps) {
     // Determine which channel to post in
@@ -867,6 +850,42 @@ async function findFrasier() {
     .single();
 
   return data || null;
+}
+
+/**
+ * Generate a clean, human-readable title from a raw founder message.
+ * WHY: Raw messages contain Discord mentions (<@id>), URLs, and verbosity
+ * that make terrible titles in announcements and Notion/Drive.
+ */
+function cleanProposalTitle(rawContent) {
+  let title = rawContent
+    // Remove Discord mentions
+    .replace(/<@!?\d+>/g, '')
+    // Remove URLs
+    .replace(/https?:\/\/\S+/g, '')
+    // Remove [PROJECT:N] tags
+    .replace(/\[PROJECT:\d+\]/g, '')
+    // Collapse whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!title) return 'Mission from Zero';
+
+  // Take first sentence (period, question mark, exclamation, or newline)
+  const firstSentence = title.split(/[.?!\n]/)[0].trim();
+  if (firstSentence.length > 10) {
+    title = firstSentence;
+  }
+
+  // Cap at 120 chars, break at word boundary
+  if (title.length > 120) {
+    title = title.substring(0, 120).replace(/\s+\S*$/, '').trim();
+  }
+
+  // Capitalize first letter
+  title = title.charAt(0).toUpperCase() + title.slice(1);
+
+  return title;
 }
 
 /**

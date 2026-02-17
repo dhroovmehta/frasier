@@ -327,3 +327,30 @@
 - Replaced default `team-research` routing with intelligent matching
 - `findBestAgentAcrossTeams()` → if no match → `autoHireGapAgent()` → if pool empty → `createHiringProposal()` (fallback)
 - Uses matched agent's actual team as target team
+
+---
+
+## Post-Overhaul Fixes (Feb 17, 2026)
+
+### Clean Proposal Titles
+- **File:** `src/discord_bot.js`
+- **Problem:** Proposal titles were set to `content.substring(0, 200)` — the raw Discord message including `<@id>` mentions, URLs, and verbose instructions. This produced ugly announcement titles and Notion/Drive document names.
+- **Fix:** `cleanProposalTitle(rawContent)` function:
+  - Strips Discord mentions (`<@id>`)
+  - Strips URLs
+  - Strips `[PROJECT:N]` tags
+  - Extracts first sentence
+  - Caps at 120 chars on word boundary
+  - Capitalizes first letter
+  - Fallback: "Mission from Zero" if nothing meaningful remains
+- Applied to all 4 proposal creation paths: `[ACTION:PROPOSAL]`, `[ACTION:MULTI_STEP_PROPOSAL]`, `[ACTION:NEW_PROJECT]` fallback, and error fallback
+
+### Tier 2 → Tier 1 Fallback
+- **File:** `src/lib/models.js`
+- **Problem:** When tier2 (Manus) failed for any reason other than credit exhaustion (e.g., endpoint not configured), the step was marked `failed` with no recovery path. Auto-tier-selection could upgrade steps to tier2, making them permanently stuck.
+- **Fix:** When tier2 fails and tier wasn't force-selected, automatically retry with tier1 (MiniMax via OpenRouter). Logged as `{ fallbackFrom: 'tier2' }` in model usage tracking.
+
+### Announcement Error Logging
+- **File:** `src/discord_bot.js`
+- **Problem:** `announceCompletedSteps()` silently swallowed Supabase query errors — `if (error || !steps) return` with no logging. Made announcement failures invisible.
+- **Fix:** Added explicit error logging: `console.error('[discord] announceCompletedSteps query error:', error.message)`
