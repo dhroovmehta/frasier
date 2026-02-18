@@ -10,11 +10,14 @@ Bugs, incidents, and fixes. Most recent first.
 
 **Symptom:** Step #50 completed and was auto-approved, but never posted to Discord. Steps #48 and #49 from the same project were posted successfully.
 
-**Root Cause:** `announceCompletedSteps()` had no try/catch around individual step processing. If the Notion or Google Drive publish call for one step threw an error, the entire loop aborted — that step was never marked `announced = true`, and no subsequent steps were announced either. On the next poll, the failed step would retry and fail again (infinite loop).
+**Root Cause:** Two compounding issues:
+1. `announceCompletedSteps()` had no try/catch — one Notion/Drive error aborted the entire loop
+2. `announced = true` was set AFTER publishing — so when Supabase returned Cloudflare 500 errors after Notion/Drive succeeded, the flag never persisted. Next poll cycle, the step was re-published (duplicate Notion pages + Google Docs every 30 seconds).
 
-**Fix:** Two layers of error handling:
-1. Inner try/catch around Notion/Drive publish — if publish fails, still announce to Discord (just without links)
-2. Outer try/catch around each step — if anything fails, log the error and continue to the next step
+**Fix:** Three changes:
+1. Mark `announced = true` BEFORE publishing — prevents infinite duplicate Notion pages/Google Docs
+2. Inner try/catch around Notion/Drive publish — if publish fails, still announce to Discord (without links)
+3. Outer try/catch around each step — if anything fails, log and continue to next step
 
 **Files:** `src/discord_bot.js`
 

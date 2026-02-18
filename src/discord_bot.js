@@ -706,6 +706,19 @@ async function announceCompletedSteps() {
 
   for (const step of steps) {
     try {
+      // Mark as announced FIRST to prevent duplicate Notion/Drive publishes
+      // WHY: If Supabase 500s after publishing, the step stays announced=false
+      // and gets re-published every poll cycle (duplicate pages/docs).
+      const { error: updateErr } = await supabase
+        .from('mission_steps')
+        .update({ announced: true })
+        .eq('id', step.id);
+
+      if (updateErr) {
+        console.error(`[discord] Failed to mark step #${step.id} as announced: ${updateErr.message}`);
+        continue; // Skip — don't publish if we can't prevent duplicates
+      }
+
       // Determine which channel to post in
       const channelName = getTeamChannel(step.missions.team_id);
       const channel = channels[channelName] || channels['general'];
@@ -736,7 +749,6 @@ async function announceCompletedSteps() {
         await sendSplit(channel, announcement);
       } else {
         // FINAL STEP (or single-step mission): publish to Notion and Google Drive
-        // Wrap publish calls so failures don't block Discord announcement
         let notionPage = null, driveDoc = null;
         try {
           [notionPage, driveDoc] = await Promise.all([
@@ -759,7 +771,6 @@ async function announceCompletedSteps() {
           ]);
         } catch (publishErr) {
           console.error(`[discord] Notion/Drive publish failed for step #${step.id}: ${publishErr.message}`);
-          // Continue — still announce to Discord without links
         }
 
         const links = [];
@@ -774,15 +785,10 @@ async function announceCompletedSteps() {
         await sendSplit(channel, announcement);
       }
 
-      // Mark as announced
-      await supabase
-        .from('mission_steps')
-        .update({ announced: true })
-        .eq('id', step.id);
+      console.log(`[discord] Announced step #${step.id}: ${step.missions.title}`);
 
     } catch (err) {
       console.error(`[discord] Failed to announce step #${step.id}: ${err.message}`);
-      // Continue to next step — don't let one failure block all announcements
     }
   }
 }
