@@ -1556,7 +1556,7 @@ Founder is non-technical but needs to run commands on VPS. Initial instructions 
 
 ## Future Roadmap
 
-> **Status as of Feb 17, 2026:** Phases 2-3 complete (smart routing, memory, integrations, quality overhaul). See `COMPLETED.md` for details.
+> **Status as of Feb 17, 2026:** Phases 2-3 complete, autonomous lifecycle operational (v0.4.1). See `COMPLETED.md` for details.
 
 ### COMPLETED — Phase 2: Smart Routing & Multi-Agent Operations (v0.2.0–v0.3.0)
 - Smart routing via keyword matching + cross-team agent search
@@ -1574,6 +1574,12 @@ Founder is non-technical but needs to run commands on VPS. Initial instructions 
 - Industry-specific persona generation with project context
 - Domain expert reviews (cross-team specialist routing)
 - 144 tests across 12 suites
+
+### COMPLETED — Phase 2.6: Autonomous Lifecycle (v0.4.1)
+- Auto-phase-progression: projects advance through phases autonomously (discovery → requirements → design → build → test → deploy) with each phase's output passed as context to the next
+- Stalled project detection: heartbeat auto-recovers projects stuck with no active missions
+- Announcement duplicate prevention: optimistic flagging prevents infinite Notion/Drive re-publishes on Supabase errors
+- OpenRouter model ID fix: T2/T3 now correctly reach Claude Sonnet 4.5 and Opus (Decisions D-018 through D-020)
 
 ### NEXT — Agent Social Dynamics
 **Timeline:** Feb 18-21, 2026

@@ -208,3 +208,45 @@ Fallback chain: T3→T2→T1 if higher tier fails.
 **Context:** Deployed with `git pull && pm2 restart all` but forgot `npm install`. Missing `nodemailer` dependency took down discord_bot + heartbeat for hours.
 
 **Decision:** Always use `./deploy.sh` which includes `npm install`. Never skip dependency installation.
+
+---
+
+## D-018: Auto-Phase-Progression (No Manual Intervention)
+
+**Date:** Feb 17, 2026 | **Status:** Active | **Author:** Zero + Kael
+
+**Context:** When a project advanced phases (e.g., discovery → requirements), `advanceProjectPhase()` only updated the phase label. No mission was created for the new phase. Projects stalled after every phase until the founder manually triggered the next task. Zero explicitly rejected requiring manual intervention: "why do I need to manually trigger it?"
+
+**Decision:** Heartbeat automatically creates a mission proposal for the next phase after each phase advancement. The proposal includes the prior phase's deliverable output (truncated to 2000 chars) as context so work builds incrementally. `PHASE_TASKS` constant defines what each phase should produce.
+
+**Rationale:** The system should be fully autonomous. Founder oversight is for direction, not for pushing each phase forward manually.
+
+**Files changed:** `src/heartbeat.js`
+
+---
+
+## D-019: Stalled Project Detection (Autonomous Catch-Up)
+
+**Date:** Feb 17, 2026 | **Status:** Active | **Author:** Kael
+
+**Context:** Projects that were already stuck in a phase (before D-018 was implemented) had no recovery path. Also covers edge cases where a phase mission fails or gets lost.
+
+**Decision:** `checkStalledProjects()` runs every heartbeat tick. Scans active projects for any that have no pending proposals AND no active missions. Auto-creates the missing phase mission when detected.
+
+**Rationale:** Defense-in-depth for autonomous operation. Even if auto-phase-progression fails or misses a case, stalled detection catches it on the next tick. Cost: one DB query per tick.
+
+**Files changed:** `src/heartbeat.js`
+
+---
+
+## D-020: Optimistic Announcement Flagging (Mark Before Execute)
+
+**Date:** Feb 17, 2026 | **Status:** Active | **Author:** Kael
+
+**Context:** `announceCompletedSteps()` published to Notion/Google Drive, then set `announced = true`. When Supabase returned intermittent Cloudflare 500 errors, the flag never persisted — causing infinite duplicate Notion pages and Google Docs every 30-second poll cycle.
+
+**Decision:** Mark `announced = true` BEFORE publishing. If the flag can't be set (Supabase error), skip the step entirely. A missed announcement is recoverable (check DB); infinite duplicate documents are not.
+
+**Rationale:** Reusable pattern for all side-effect operations: set the "processed" flag first, execute second. The cost of a missed execution (can retry manually) is far lower than infinite duplicate executions. Applies to any polling-based system with external side effects.
+
+**Trade-offs:** If the system crashes between marking and publishing, the step is never announced. Acceptable — the data exists in the DB and can be re-announced manually.

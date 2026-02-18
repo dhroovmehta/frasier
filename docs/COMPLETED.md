@@ -1,6 +1,6 @@
 # Frasier — Completed Features
 
-> Last updated: Feb 17, 2026
+> Last updated: Feb 17, 2026 (v0.4.1)
 
 ---
 
@@ -354,6 +354,38 @@
 - **File:** `src/discord_bot.js`
 - **Problem:** `announceCompletedSteps()` silently swallowed Supabase query errors — `if (error || !steps) return` with no logging. Made announcement failures invisible.
 - **Fix:** Added explicit error logging: `console.error('[discord] announceCompletedSteps query error:', error.message)`
+
+---
+
+## Autonomous Lifecycle & Announcement Fixes (Feb 17, 2026)
+
+### Auto-Phase-Progression
+- **File modified:** `src/heartbeat.js`
+- **Problem:** When a project advanced phases (e.g., discovery → requirements), `advanceProjectPhase()` only updated the phase label in the database. No mission was created for the new phase — projects stalled after every phase advancement until the founder manually triggered the next task.
+- **Changes:**
+  - `PHASE_TASKS` constant: maps each phase (requirements, design, build, test, deploy) to a description of what work the agent should produce
+  - `createNextPhaseMission(project, completedMission)`: creates a mission proposal for the next phase, injecting the prior phase's deliverable output (truncated to 2000 chars) as context so the next agent builds on previous work
+  - Called automatically from `checkMissions()` after phase advancement when the project isn't yet completed
+  - Handles null `completedMission` gracefully (looks up latest project mission for catch-up scenarios)
+
+### Stalled Project Detection
+- **File modified:** `src/heartbeat.js`
+- **Problem:** Projects that were already stuck (advanced to a phase before the auto-progression fix) would never recover. No mechanism to detect "active project in a phase with zero work happening."
+- **Changes:**
+  - `checkStalledProjects()`: runs every heartbeat tick, scans all active (non-completed) projects
+  - For each project, checks if there are any pending proposals OR active missions (pending/in_progress steps)
+  - If neither exists, auto-creates the missing phase mission via `createNextPhaseMission(project, null)`
+  - Added as step 5 in the heartbeat `tick()` function
+
+### Announcement Duplicate Prevention
+- **File modified:** `src/discord_bot.js`
+- **Problem:** `announceCompletedSteps()` set `announced = true` AFTER publishing to Notion/Google Drive. When Supabase returned Cloudflare 500 errors (intermittent on free tier), the flag never persisted. The step was re-published every 30-second poll cycle — creating infinite duplicate Notion pages and Google Docs.
+- **Fix:** Mark `announced = true` BEFORE publishing. If the flag can't be set (Supabase error), skip the step entirely rather than risk duplicates. Added inner try/catch around Notion/Drive (still announces to Discord without links on publish failure) and outer try/catch per step (one failure doesn't block all announcements).
+
+### OpenRouter Model ID Fix
+- **File modified:** `src/lib/models.js`
+- **Problem:** Model IDs used date-suffixed format (`anthropic/claude-sonnet-4-5-20250929`, `anthropic/claude-opus-4-20250514`) which OpenRouter rejected with API 400 errors. All T2/T3 tasks silently fell back to T1 MiniMax.
+- **Fix:** Changed to short-form IDs: `anthropic/claude-sonnet-4.5` (T2), `anthropic/claude-opus-4` (T3).
 
 ---
 

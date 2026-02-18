@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.4.1] — 2026-02-17 (Autonomous Lifecycle + Announcement Fix)
+
+### Added
+- **Auto-phase-progression:** When a project completes a phase, heartbeat automatically creates a mission proposal for the next phase with prior phase output as context. No manual intervention needed. (`PHASE_TASKS` constant defines work for each phase.)
+- **Stalled project detection:** `checkStalledProjects()` runs every heartbeat tick — detects active projects stuck in a phase with no active missions or pending proposals, and auto-creates the missing phase mission.
+
+### Fixed
+- **OpenRouter model IDs:** Changed `anthropic/claude-sonnet-4-5-20250929` → `anthropic/claude-sonnet-4.5` and `anthropic/claude-opus-4-20250514` → `anthropic/claude-opus-4`. Old date-suffixed IDs returned API 400 errors, causing all T2/T3 tasks to fall back to T1 MiniMax.
+- **Announcement duplicate spam:** `announced = true` was set AFTER Notion/Drive publishing. When Supabase returned Cloudflare 500 errors after publish succeeded, the flag never persisted — steps were re-published every 30-second poll cycle (infinite duplicate Notion pages + Google Docs). Fix: mark `announced = true` BEFORE publishing.
+- **Announcement loop crash:** No try/catch around individual step processing in `announceCompletedSteps()`. One Notion/Drive error aborted announcements for all remaining steps. Fix: inner try/catch around Notion/Drive (still announces to Discord without links) + outer try/catch per step (skips failed step, continues loop).
+
+---
+
 ## [0.4.0] — 2026-02-17 (Quality Overhaul)
 
 ### Added

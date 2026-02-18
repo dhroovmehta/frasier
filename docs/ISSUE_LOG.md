@@ -4,6 +4,20 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-012: OpenRouter rejects date-suffixed model IDs (T2/T3 always fall back to T1)
+
+**Date:** Feb 17, 2026 | **Severity:** Critical | **Status:** Fixed
+
+**Symptom:** Worker logs: `[models] Tier 2 (claude-sonnet-4.5) failed: API 400: anthropic/claude-sonnet-4-5-20250929 is not a valid model ID`. All T2/T3 tasks silently degraded to T1 MiniMax, producing shallow output.
+
+**Root Cause:** Model IDs used OpenRouter's date-suffixed format (`anthropic/claude-sonnet-4-5-20250929`, `anthropic/claude-opus-4-20250514`) which is not accepted by OpenRouter. OpenRouter uses short-form IDs.
+
+**Fix:** Changed to short-form IDs: `anthropic/claude-sonnet-4.5` (T2), `anthropic/claude-opus-4` (T3).
+
+**Files:** `src/lib/models.js`, `docs/CHANGELOG.md`, `docs/COMPLETED.md`, `docs/PRD.md`
+
+---
+
 ## ISS-011: Completed steps not announced to Discord (Notion/Drive error blocks loop)
 
 **Date:** Feb 17, 2026 | **Severity:** High | **Status:** Fixed
