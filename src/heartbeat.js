@@ -88,13 +88,16 @@ async function tick() {
   // 3. Route steps through approval chain
   await processApprovals();
 
-  // 4. Check for completed missions
+  // 4. Check for completed missions (+ auto-create next phase missions)
   await checkMissions();
 
-  // 5. Schedule daily standup (time-based trigger)
+  // 5. Catch stalled projects (in a phase with no active/pending missions)
+  await checkStalledProjects();
+
+  // 6. Schedule daily standup (time-based trigger)
   await checkDailyStandup();
 
-  // 6. Monitoring: cost alerts, health checks, daily summary
+  // 7. Monitoring: cost alerts, health checks, daily summary
   await runMonitoring();
 }
 
@@ -695,19 +698,33 @@ async function createNextPhaseMission(project, completedMission) {
   const phase = project.phase;
   const taskDescription = PHASE_TASKS[phase] || `Continue work on the ${phase} phase.`;
 
-  // Get the result from the completed mission's steps for context
+  // Get the result from the most recent completed mission's steps for context
   let priorOutput = '';
   try {
-    const { data: steps } = await require('./lib/supabase')
-      .from('mission_steps')
-      .select('result')
-      .eq('mission_id', completedMission.id)
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (steps && steps[0] && steps[0].result) {
-      // Truncate to avoid massive proposals
-      priorOutput = steps[0].result.substring(0, 2000);
+    // If we have a specific completed mission, use it; otherwise find the latest
+    let missionId = completedMission ? completedMission.id : null;
+    if (!missionId) {
+      const { data: projectMissions } = await require('./lib/supabase')
+        .from('project_missions')
+        .select('mission_id')
+        .eq('project_id', project.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (projectMissions && projectMissions[0]) {
+        missionId = projectMissions[0].mission_id;
+      }
+    }
+    if (missionId) {
+      const { data: steps } = await require('./lib/supabase')
+        .from('mission_steps')
+        .select('result')
+        .eq('mission_id', missionId)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (steps && steps[0] && steps[0].result) {
+        priorOutput = steps[0].result.substring(0, 2000);
+      }
     }
   } catch (err) {
     console.error(`[heartbeat] Failed to fetch prior phase output:`, err.message);
@@ -785,6 +802,60 @@ async function checkMissions() {
         console.error(`[heartbeat] Project phase check failed:`, err.message);
       }
     }
+  }
+}
+
+// ============================================================
+// STALLED PROJECT DETECTION
+// ============================================================
+
+/**
+ * Find active projects that are in a phase (not 'completed') but have
+ * no active missions and no pending proposals. Auto-create the missing
+ * phase mission so the project keeps moving autonomously.
+ */
+async function checkStalledProjects() {
+  try {
+    const activeProjects = await projects.getActiveProjects();
+
+    for (const project of activeProjects) {
+      // Skip completed projects
+      if (project.phase === 'completed') continue;
+
+      // Check if there are any pending proposals for this project
+      const { data: pendingProposals } = await require('./lib/supabase')
+        .from('mission_proposals')
+        .select('id')
+        .like('title', `[PROJECT:${project.id}]%`)
+        .eq('status', 'pending')
+        .limit(1);
+
+      if (pendingProposals && pendingProposals.length > 0) continue;
+
+      // Check if there are any active (non-completed) missions for this project
+      const { data: projectMissions } = await require('./lib/supabase')
+        .from('project_missions')
+        .select('mission_id')
+        .eq('project_id', project.id);
+
+      if (!projectMissions || projectMissions.length === 0) continue;
+
+      const missionIds = projectMissions.map(pm => pm.mission_id);
+      const { data: activeMissions } = await require('./lib/supabase')
+        .from('missions')
+        .select('id')
+        .in('id', missionIds)
+        .in('status', ['in_progress', 'pending'])
+        .limit(1);
+
+      if (activeMissions && activeMissions.length > 0) continue;
+
+      // Project is stalled — has no active missions and no pending proposals
+      console.log(`[heartbeat] Project #${project.id} stalled in "${project.phase}" phase — auto-creating mission`);
+      await createNextPhaseMission(project, null);
+    }
+  } catch (err) {
+    console.error(`[heartbeat] Stalled project check failed:`, err.message);
   }
 }
 
