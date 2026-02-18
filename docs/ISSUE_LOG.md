@@ -4,6 +4,22 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-011: Completed steps not announced to Discord (Notion/Drive error blocks loop)
+
+**Date:** Feb 17, 2026 | **Severity:** High | **Status:** Fixed
+
+**Symptom:** Step #50 completed and was auto-approved, but never posted to Discord. Steps #48 and #49 from the same project were posted successfully.
+
+**Root Cause:** `announceCompletedSteps()` had no try/catch around individual step processing. If the Notion or Google Drive publish call for one step threw an error, the entire loop aborted — that step was never marked `announced = true`, and no subsequent steps were announced either. On the next poll, the failed step would retry and fail again (infinite loop).
+
+**Fix:** Two layers of error handling:
+1. Inner try/catch around Notion/Drive publish — if publish fails, still announce to Discord (just without links)
+2. Outer try/catch around each step — if anything fails, log the error and continue to the next step
+
+**Files:** `src/discord_bot.js`
+
+---
+
 ## ISS-010: COMPLEX_KEYWORDS accidentally dropped during tier restructure
 
 **Date:** Feb 17, 2026 | **Severity:** Medium | **Status:** Fixed

@@ -705,72 +705,85 @@ async function announceCompletedSteps() {
   if (!steps || steps.length === 0) return;
 
   for (const step of steps) {
-    // Determine which channel to post in
-    const channelName = getTeamChannel(step.missions.team_id);
-    const channel = channels[channelName] || channels['general'];
-    if (!channel) {
-      console.warn(`[discord] No channel found for team ${step.missions.team_id} (tried: ${channelName}, general). Skipping step #${step.id}`);
-      continue;
+    try {
+      // Determine which channel to post in
+      const channelName = getTeamChannel(step.missions.team_id);
+      const channel = channels[channelName] || channels['general'];
+      if (!channel) {
+        console.warn(`[discord] No channel found for team ${step.missions.team_id} (tried: ${channelName}, general). Skipping step #${step.id}`);
+        continue;
+      }
+
+      // Build announcement
+      const agent = await agents.getAgent(step.assigned_agent_id);
+      const agentName = agent?.display_name || step.assigned_agent_id;
+
+      // Check if this is part of a multi-step mission
+      const { data: allSteps } = await supabase
+        .from('mission_steps')
+        .select('id, step_order, status')
+        .eq('mission_id', step.mission_id)
+        .order('step_order', { ascending: true });
+
+      const totalSteps = allSteps?.length || 1;
+      const isMultiStep = totalSteps > 1;
+      const currentOrder = step.step_order || 1;
+      const isFinalStep = !isMultiStep || currentOrder === totalSteps;
+
+      if (isMultiStep && !isFinalStep) {
+        // INTERMEDIATE STEP: progress message only, no Notion/Drive publish
+        const announcement = `**Phase ${currentOrder}/${totalSteps} Complete** — ${step.missions.title}\nAgent: ${agentName} | Next phase starting automatically...`;
+        await sendSplit(channel, announcement);
+      } else {
+        // FINAL STEP (or single-step mission): publish to Notion and Google Drive
+        // Wrap publish calls so failures don't block Discord announcement
+        let notionPage = null, driveDoc = null;
+        try {
+          [notionPage, driveDoc] = await Promise.all([
+            notion.publishDeliverable({
+              title: step.missions.title,
+              content: step.result || '',
+              teamId: step.missions.team_id,
+              agentName,
+              missionId: step.mission_id,
+              stepId: step.id
+            }),
+            gdrive.publishDeliverable({
+              title: step.missions.title,
+              content: step.result || '',
+              teamId: step.missions.team_id,
+              agentName,
+              missionId: step.mission_id,
+              stepId: step.id
+            })
+          ]);
+        } catch (publishErr) {
+          console.error(`[discord] Notion/Drive publish failed for step #${step.id}: ${publishErr.message}`);
+          // Continue — still announce to Discord without links
+        }
+
+        const links = [];
+        if (notionPage?.url) links.push(`[Notion](${notionPage.url})`);
+        if (driveDoc?.url) links.push(`[Google Doc](${driveDoc.url})`);
+        const linkText = links.length > 0 ? `\n${links.join(' | ')}` : '';
+
+        const announcement = isMultiStep
+          ? `**Mission Complete (${totalSteps}/${totalSteps} phases)** — ${step.missions.title}\nAgent: ${agentName} | All phases approved${linkText}`
+          : `**Deliverable Ready** — ${step.missions.title}\nAgent: ${agentName} | Approved by Team Lead${linkText}`;
+
+        await sendSplit(channel, announcement);
+      }
+
+      // Mark as announced
+      await supabase
+        .from('mission_steps')
+        .update({ announced: true })
+        .eq('id', step.id);
+
+    } catch (err) {
+      console.error(`[discord] Failed to announce step #${step.id}: ${err.message}`);
+      // Continue to next step — don't let one failure block all announcements
     }
-
-    // Build announcement
-    const agent = await agents.getAgent(step.assigned_agent_id);
-    const agentName = agent?.display_name || step.assigned_agent_id;
-
-    // Check if this is part of a multi-step mission
-    const { data: allSteps } = await supabase
-      .from('mission_steps')
-      .select('id, step_order, status')
-      .eq('mission_id', step.mission_id)
-      .order('step_order', { ascending: true });
-
-    const totalSteps = allSteps?.length || 1;
-    const isMultiStep = totalSteps > 1;
-    const currentOrder = step.step_order || 1;
-    const isFinalStep = !isMultiStep || currentOrder === totalSteps;
-
-    if (isMultiStep && !isFinalStep) {
-      // INTERMEDIATE STEP: progress message only, no Notion/Drive publish
-      const announcement = `**Phase ${currentOrder}/${totalSteps} Complete** — ${step.missions.title}\nAgent: ${agentName} | Next phase starting automatically...`;
-      await sendSplit(channel, announcement);
-    } else {
-      // FINAL STEP (or single-step mission): publish to Notion and Google Drive
-      const [notionPage, driveDoc] = await Promise.all([
-        notion.publishDeliverable({
-          title: step.missions.title,
-          content: step.result || '',
-          teamId: step.missions.team_id,
-          agentName,
-          missionId: step.mission_id,
-          stepId: step.id
-        }),
-        gdrive.publishDeliverable({
-          title: step.missions.title,
-          content: step.result || '',
-          teamId: step.missions.team_id,
-          agentName,
-          missionId: step.mission_id,
-          stepId: step.id
-        })
-      ]);
-
-      const links = [];
-      if (notionPage?.url) links.push(`[Notion](${notionPage.url})`);
-      if (driveDoc?.url) links.push(`[Google Doc](${driveDoc.url})`);
-      const linkText = links.length > 0 ? `\n${links.join(' | ')}` : '';
-
-      const announcement = isMultiStep
-        ? `**Mission Complete (${totalSteps}/${totalSteps} phases)** — ${step.missions.title}\nAgent: ${agentName} | All phases approved${linkText}`
-        : `**Deliverable Ready** — ${step.missions.title}\nAgent: ${agentName} | Approved by Team Lead${linkText}`;
-
-      await sendSplit(channel, announcement);
-    }
-
-    // Mark as announced
-    await supabase
-      .from('mission_steps')
-      .update({ announced: true })
-      .eq('id', step.id);
   }
 }
 
