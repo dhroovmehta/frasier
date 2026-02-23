@@ -271,7 +271,7 @@ async function enrichAllAgents() {
       .maybeSingle();
 
     if (personaError || !persona) {
-      console.error(`[enrich]   Failed to fetch persona: ${personaError?.message || 'not found'}`);
+      console.error(`[enrich]   Failed to fetch persona: ${(personaError && personaError.message) || 'not found'}`);
       failed++;
       continue;
     }
