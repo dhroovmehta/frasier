@@ -28,6 +28,7 @@ const alerts = require('./lib/alerts');
 const web = require('./lib/web');
 const projects = require('./lib/projects');
 const content = require('./lib/content');
+const linear = require('./lib/linear');
 
 // ============================================================
 // DISCORD CLIENT SETUP
@@ -1099,9 +1100,18 @@ async function announceCompletedSteps() {
       const currentOrder = step.step_order || 1;
       const isFinalStep = !isMultiStep || currentOrder === totalSteps;
 
+      // Fetch Linear project link for announcements
+      let linearUrl = null;
+      try {
+        linearUrl = await linear.getProjectUrl(step.mission_id);
+      } catch (err) {
+        // Non-blocking — Linear link is nice-to-have
+      }
+
       if (isMultiStep && !isFinalStep) {
         // INTERMEDIATE STEP: progress message only, no Notion/Drive publish
-        const announcement = `**Phase ${currentOrder}/${totalSteps} Complete** — ${step.missions.title}\nAgent: ${agentName} | Next phase starting automatically...`;
+        const linearLink = linearUrl ? `\n[Linear](${linearUrl})` : '';
+        const announcement = `**Phase ${currentOrder}/${totalSteps} Complete** — ${step.missions.title}\nAgent: ${agentName} | Next phase starting automatically...${linearLink}`;
         await sendSplit(channel, announcement);
       } else {
         // FINAL STEP (or single-step mission): publish to Notion and Google Drive
@@ -1129,9 +1139,17 @@ async function announceCompletedSteps() {
           console.error(`[discord] Notion/Drive publish failed for step #${step.id}: ${publishErr.message}`);
         }
 
+        // Post deliverable link as comment on Linear issue (fire-and-forget)
+        if (driveDoc?.url) {
+          linear.addIssueComment(step.id, `Deliverable ready: ${driveDoc.url}`).catch(err =>
+            console.error(`[discord] Linear comment failed (non-blocking): ${err.message}`)
+          );
+        }
+
         const links = [];
         if (notionPage?.url) links.push(`[Notion](${notionPage.url})`);
         if (driveDoc?.url) links.push(`[Google Doc](${driveDoc.url})`);
+        if (linearUrl) links.push(`[Linear](${linearUrl})`);
         const linkText = links.length > 0 ? `\n${links.join(' | ')}` : '';
 
         const announcement = isMultiStep

@@ -353,3 +353,27 @@ Fallback chain: T3→T2→T1 if higher tier fails.
 **Trade-offs:** Risk of auto-approving a step that looks good by score but has domain errors. Mitigated: final step always reviewed, and approach memory captures quality trends over time.
 
 **Files:** `src/lib/autonomy.js`, `src/heartbeat.js`, `sql/004_deep_work_pipeline.sql`
+
+---
+
+## D-027: Linear as Mission Control — Labels Not Members
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Dhroov had no visibility into what Frasier's agents were doing. Discord was the only interface — commands in, deliverables out. No dashboard, no project-level tracking, no way to see progress at a glance.
+
+**Decision:** Integrate Linear as a two-way project management layer:
+- Single API key, agents represented as labels (not individual accounts). Zero extra seat cost.
+- Frasier → Linear: missions become projects, steps become issues, status auto-syncs.
+- Linear → Frasier: Dhroov creates project + first task, Frasier picks it up via webhook.
+- Discord stays as real-time channel — both channels always in sync.
+- LLM polishes titles/descriptions (tier-1 MiniMax) for clean presentation.
+- All sync is fire-and-forget — Linear failure never blocks mission execution.
+
+**Rationale:** Linear is purpose-built for project/ticket workflows. Custom Mission Control app would take weeks to replicate what Linear does out of the box. Labels avoid per-seat costs and fake email complexity.
+
+**Rejected:** Custom NextJS+Convex dashboard (over-engineered), individual agent Linear accounts (unnecessary cost), Notion (already used for deliverables, not ideal for ticket workflows).
+
+**Trade-offs:** Depends on Linear's free tier (250 active issues). At current throughput (~5-10 missions/week) this is fine. Custom fields require Linear UI or API setup.
+
+**Files:** `src/lib/linear.js`, `src/lib/missions.js`, `src/heartbeat.js`, `src/discord_bot.js`, `sql/005_linear_integration.sql`

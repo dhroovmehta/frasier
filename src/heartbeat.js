@@ -26,6 +26,7 @@ const gdrive = require('./lib/google_drive');
 const github = require('./lib/github');
 const notion = require('./lib/notion');
 const projects = require('./lib/projects');
+const linear = require('./lib/linear');
 
 const POLL_INTERVAL_MS = 30 * 1000; // 30 seconds
 const HEALTH_PORT = process.env.HEALTH_PORT || 8787;
@@ -52,6 +53,12 @@ async function main() {
   // If heartbeat is down, the external service emails Zero directly —
   // completely independent of our nodemailer/alerts pipeline.
   startHealthServer();
+
+  // Initialize Linear integration (labels, workflow states, custom fields)
+  // WHY: Idempotent — creates missing resources only. Runs once on startup.
+  await linear.initialize().catch(err =>
+    console.error(`[heartbeat] Linear init failed (non-blocking): ${err.message}`)
+  );
 
   await events.logEvent({
     eventType: 'heartbeat_started',
@@ -80,6 +87,13 @@ async function main() {
  * One tick of the heartbeat. Runs all checks in sequence.
  */
 async function tick() {
+  // 0. Poll Linear for new issues created by Dhroov
+  // WHY: Linear webhooks require HTTPS. Polling every 30s is simpler —
+  // no SSL certs, no reverse proxy, no external dependencies.
+  await linear.pollForNewIssues().catch(err =>
+    console.error(`[heartbeat] Linear poll error (non-blocking): ${err.message}`)
+  );
+
   // 1. Process new proposals → missions (with gap detection for hiring)
   await processProposals();
 
@@ -1259,8 +1273,32 @@ function sleep(ms) {
  * Alert: UptimeRobot emails Zero directly if endpoint goes down — completely
  * independent of our internal Discord/email alerting pipeline.
  */
+/**
+ * Parse JSON body from a raw HTTP request.
+ * WHY: http.createServer has no built-in body parsing. We need this for webhooks.
+ */
+function parseRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString();
+      try {
+        resolve({ raw, parsed: JSON.parse(raw) });
+      } catch (e) {
+        reject(new Error('Invalid JSON body'));
+      }
+    });
+    req.on('error', reject);
+    setTimeout(() => reject(new Error('Body read timeout')), 30000);
+  });
+}
+
 function startHealthServer() {
-  const server = http.createServer((req, res) => {
+  const crypto = require('crypto');
+
+  const server = http.createServer(async (req, res) => {
+    // GET /health — existing health check
     if (req.url === '/health' && req.method === 'GET') {
       const now = Date.now();
       const tickAge = lastTickTime ? Math.round((now - lastTickTime) / 1000) : null;
@@ -1278,7 +1316,40 @@ function startHealthServer() {
       const httpCode = stalled ? 503 : 200;
       res.writeHead(httpCode, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(status));
-    } else {
+    }
+    // POST /webhooks/linear — inbound Linear webhook
+    else if (req.url === '/webhooks/linear' && req.method === 'POST') {
+      try {
+        const body = await parseRequestBody(req);
+
+        // Validate HMAC-SHA256 signature
+        const signature = req.headers['linear-signature'];
+        const secret = process.env.LINEAR_WEBHOOK_SECRET;
+
+        if (!linear.validateWebhookSignature(body.raw, signature, secret)) {
+          console.warn('[heartbeat] Invalid Linear webhook signature');
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid signature' }));
+          return;
+        }
+
+        // Acknowledge immediately (Linear expects fast response)
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true }));
+
+        // Process asynchronously (don't block the response)
+        linear.processLinearWebhook(body.parsed).catch(err =>
+          console.error(`[heartbeat] Webhook processing error: ${err.message}`)
+        );
+      } catch (err) {
+        console.error('[heartbeat] Webhook handler error:', err.message);
+        if (!res.headersSent) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Bad request' }));
+        }
+      }
+    }
+    else {
       res.writeHead(404);
       res.end('Not found');
     }

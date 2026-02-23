@@ -4,6 +4,7 @@
 // steps assigned to agents → worker executes → approval chain → result delivered.
 
 const supabase = require('./supabase');
+const linear = require('./linear');
 
 // Agent expertise map for keyword-based routing
 const EXPERTISE_MAP = {
@@ -184,6 +185,12 @@ async function createMission({
   }
 
   console.log(`[missions] Mission #${data.id} created: "${title}" for team ${teamId}`);
+
+  // Sync to Linear (fire-and-forget)
+  linear.syncMissionToLinear(data).catch(err =>
+    console.error(`[linear] Mission sync failed (non-blocking): ${err.message}`)
+  );
+
   return data;
 }
 
@@ -230,6 +237,12 @@ async function completeMission(missionId) {
   }
 
   console.log(`[missions] Mission #${missionId} completed`);
+
+  // Sync to Linear (fire-and-forget)
+  linear.completeProject(missionId).catch(err =>
+    console.error(`[linear] Mission complete sync failed (non-blocking): ${err.message}`)
+  );
+
   return data;
 }
 
@@ -252,6 +265,12 @@ async function failMission(missionId, reason = null) {
     console.error(`[missions] Failed to mark mission #${missionId} as failed:`, error.message);
     return null;
   }
+
+  // Sync to Linear (fire-and-forget)
+  linear.cancelProject(missionId).catch(err =>
+    console.error(`[linear] Mission fail sync failed (non-blocking): ${err.message}`)
+  );
+
   return data;
 }
 
@@ -289,6 +308,12 @@ async function createStep({
   }
 
   console.log(`[missions] Step #${data.id} created for mission #${missionId}: "${description.substring(0, 60)}..."`);
+
+  // Sync to Linear (fire-and-forget)
+  linear.syncStepToLinear(data).catch(err =>
+    console.error(`[linear] Step sync failed (non-blocking): ${err.message}`)
+  );
+
   return data;
 }
 
@@ -357,6 +382,15 @@ async function claimStep(stepId) {
     // Likely already claimed by another worker
     return null;
   }
+
+  // Sync to Linear (fire-and-forget)
+  linear.updateIssueStatus(stepId, 'In Progress').catch(err =>
+    console.error(`[linear] Claim sync failed (non-blocking): ${err.message}`)
+  );
+  linear.updateIssueCustomField(stepId, 'Started At', new Date().toISOString()).catch(err =>
+    console.error(`[linear] Started At sync failed (non-blocking): ${err.message}`)
+  );
+
   return data;
 }
 
@@ -381,6 +415,12 @@ async function completeStep(stepId, result, resultFormat = 'text') {
     console.error(`[missions] Failed to complete step #${stepId}:`, error.message);
     return null;
   }
+
+  // Sync to Linear (fire-and-forget)
+  linear.updateIssueStatus(stepId, 'In Review').catch(err =>
+    console.error(`[linear] Review sync failed (non-blocking): ${err.message}`)
+  );
+
   return data;
 }
 
@@ -428,6 +468,12 @@ async function sendBackForRevision(stepId) {
     console.error(`[missions] Failed to send step #${stepId} back:`, error.message);
     return null;
   }
+
+  // Sync to Linear (fire-and-forget)
+  linear.updateIssueStatus(stepId, 'Backlog').catch(err =>
+    console.error(`[linear] Revision sync failed (non-blocking): ${err.message}`)
+  );
+
   return data;
 }
 
@@ -449,6 +495,18 @@ async function approveStep(stepId) {
     console.error(`[missions] Failed to approve step #${stepId}:`, error.message);
     return null;
   }
+
+  // Sync to Linear (fire-and-forget)
+  linear.updateIssueStatus(stepId, 'Done').catch(err =>
+    console.error(`[linear] Approve sync failed (non-blocking): ${err.message}`)
+  );
+  linear.updateIssueCustomField(stepId, 'Completed At', new Date().toISOString()).catch(err =>
+    console.error(`[linear] Completed At sync failed (non-blocking): ${err.message}`)
+  );
+  linear.syncCritiqueScore(stepId).catch(err =>
+    console.error(`[linear] Critique score sync failed (non-blocking): ${err.message}`)
+  );
+
   return data;
 }
 

@@ -4,6 +4,37 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.8.0] — 2026-02-23 (Linear Integration — Mission Control)
+
+### Added
+- **Linear API Client (`src/lib/linear.js`):** Two-way sync between Frasier missions and Linear projects/issues. Raw GraphQL via `fetch()` — no SDK, zero new dependencies.
+- **LLM Title Polishing:** Tier-1 (MiniMax) rewrites raw task descriptions into clean, professional Linear ticket titles and descriptions.
+- **Webhook Handler:** `POST /webhooks/linear` on port 8787. HMAC-SHA256 signature validation. Dhroov creates a project + issue in Linear → Frasier picks it up as a new mission.
+- **12 Agent Labels + 7 Work Type Labels + 1 System Label:** Created programmatically on startup. All 12 active agents represented: Frasier, Gendo, Sahaquiel, Toji, Kaworu, Ritsuko, Armisael, Shamshel, Zechs, Zeruel, Jet, Rei.
+- **Custom Fields on Issues:** Self-Critique Score, Discord Link, Notion Link, Started At, Completed At.
+- **Custom Fields on Projects:** Start Date, Completion Date.
+- **Deliverable Comments:** Google Drive links posted as comments on Linear issues when work completes.
+- **PRD:** `docs/PRD_LINEAR_INTEGRATION.md` (v2.0) — full requirements, ticket specs, data flow.
+- **SQL Migration:** `sql/005_linear_integration.sql` — `linear_sync` tracking table.
+- **TDD Tests:** 38 new tests across 2 test suites (`tests/linear/`).
+
+### Modified
+- **`src/lib/missions.js`:** 8 fire-and-forget Linear sync calls added to lifecycle functions (createMission, createStep, claimStep, completeStep, approveStep, sendBackForRevision, completeMission, failMission).
+- **`src/heartbeat.js`:** Linear initialization on startup + webhook route added to health server.
+- **`src/discord_bot.js`:** Discord announcements now include Linear project link. Deliverable Google Drive links posted as comments on Linear issues.
+
+### Cost Impact
+- Linear: $0/month (free tier API)
+- LLM title polishing: ~$0.02-0.20/month (tier-1 MiniMax)
+- Zero new npm dependencies, zero new PM2 processes
+
+### Notes
+- All 248 tests pass (210 existing + 38 new, zero regressions).
+- Graceful degradation: if LINEAR_API_KEY is unset, all sync functions return null silently.
+- Both entry points work: Discord → Frasier → Linear, and Linear → Frasier → Discord.
+
+---
+
 ## [0.7.0] — 2026-02-23 (Deep Work Pipeline)
 
 ### Added
