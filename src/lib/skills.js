@@ -12,37 +12,71 @@ const events = require('./events');
 // ============================================================
 // ROLE → INITIAL SKILLS MAP
 // ============================================================
-// When a new agent is hired, they get 3 starter skills at proficiency 1.
-// Role matching is case-insensitive substring match.
+// When a new agent is hired, they get starter skills at proficiency 1.
+// Role matching is case-insensitive substring match against ROLE_SKILLS keys.
+// Multiple keys can map to the same skill set (aliases for flexible matching).
+
+const STRATEGY_SKILLS = ['strategic_planning', 'business_modeling', 'leadership',
+                  'product_management', 'planning_execution', 'decision_frameworks',
+                  'startup_analysis', 'metrics_kpi', 'business_analysis'];
+const RESEARCH_SKILLS = ['market_research', 'data_analysis', 'competitive_intel',
+                  'deep_research', 'competitive_analysis', 'market_sizing', 'data_storytelling',
+                  'pricing_research', 'analytics_design', 'research_methodology'];
+const CONTENT_SKILLS = ['copywriting', 'social_media', 'brand_storytelling',
+                  'seo_content_writing', 'marketing_psychology', 'content_planning',
+                  'content_marketing', 'email_marketing', 'content_auditing'];
+const ENGINEER_SKILLS = ['software_engineering', 'system_architecture', 'debugging',
+                  'fullstack_development', 'architecture_patterns', 'backend_architecture',
+                  'clean_code', 'error_handling', 'database_architecture', 'api_design', 'code_review'];
+const QA_SKILLS = ['quality_assurance', 'security_auditing', 'test_design',
+                  'tdd', 'systematic_debugging', 'bug_detection', 'threat_modeling',
+                  'e2e_testing', 'code_review_excellence'];
+const GROWTH_SKILLS = ['seo_optimization', 'campaign_management', 'funnel_design',
+                  'programmatic_seo', 'growth_tooling', 'pricing_strategy',
+                  'ab_testing', 'launch_strategy', 'keyword_strategy', 'conversion_optimization'];
+const KNOWLEDGE_SKILLS = ['documentation', 'knowledge_synthesis', 'information_architecture',
+                  'docs_architecture', 'wiki_architecture', 'wiki_research',
+                  'doc_templates', 'data_storytelling', 'decision_records', 'prose_quality'];
 
 const ROLE_SKILLS = {
-  'research':    ['market_research', 'data_analysis', 'competitive_intel',
-                  'deep_research', 'competitive_analysis', 'market_sizing', 'data_storytelling',
-                  'pricing_research', 'analytics_design', 'research_methodology'],
-  'strategy':    ['strategic_planning', 'business_modeling', 'leadership',
-                  'product_management', 'planning_execution', 'decision_frameworks',
-                  'startup_analysis', 'metrics_kpi', 'business_analysis'],
-  'content':     ['copywriting', 'social_media', 'brand_storytelling',
-                  'seo_content_writing', 'marketing_psychology', 'content_planning',
-                  'content_marketing', 'email_marketing', 'content_auditing'],
-  'engineer':    ['software_engineering', 'system_architecture', 'debugging',
-                  'fullstack_development', 'architecture_patterns', 'backend_architecture',
-                  'clean_code', 'error_handling', 'database_architecture', 'api_design', 'code_review'],
-  'qa':          ['quality_assurance', 'security_auditing', 'test_design',
-                  'tdd', 'systematic_debugging', 'bug_detection', 'threat_modeling',
-                  'e2e_testing', 'code_review_excellence'],
-  'growth':      ['seo_optimization', 'campaign_management', 'funnel_design',
-                  'programmatic_seo', 'growth_tooling', 'pricing_strategy',
-                  'ab_testing', 'launch_strategy', 'keyword_strategy', 'conversion_optimization'],
-  'marketing':   ['seo_optimization', 'campaign_management', 'funnel_design',
-                  'programmatic_seo', 'growth_tooling', 'pricing_strategy',
-                  'ab_testing', 'launch_strategy', 'keyword_strategy', 'conversion_optimization'],
-  'knowledge':   ['documentation', 'knowledge_synthesis', 'information_architecture',
-                  'docs_architecture', 'wiki_architecture', 'wiki_research',
-                  'doc_templates', 'data_storytelling', 'decision_records', 'prose_quality'],
-  'curator':     ['documentation', 'knowledge_synthesis', 'information_architecture',
-                  'docs_architecture', 'wiki_architecture', 'wiki_research',
-                  'doc_templates', 'data_storytelling', 'decision_records', 'prose_quality']
+  // Strategy aliases
+  'strategy':    STRATEGY_SKILLS,
+  'chief':       STRATEGY_SKILLS,
+  'coo':         STRATEGY_SKILLS,
+  'business':    STRATEGY_SKILLS,
+  'financial':   STRATEGY_SKILLS,
+  // Research aliases
+  'research':    RESEARCH_SKILLS,
+  'analyst':     RESEARCH_SKILLS,
+  'intelligence': RESEARCH_SKILLS,
+  // Content aliases
+  'content':     CONTENT_SKILLS,
+  'writer':      CONTENT_SKILLS,
+  'editor':      CONTENT_SKILLS,
+  'newsletter':  CONTENT_SKILLS,
+  'copy':        CONTENT_SKILLS,
+  // Engineer aliases
+  'engineer':    ENGINEER_SKILLS,
+  'developer':   ENGINEER_SKILLS,
+  'fullstack':   ENGINEER_SKILLS,
+  'full-stack':  ENGINEER_SKILLS,
+  'architect':   ENGINEER_SKILLS,
+  // QA aliases
+  'qa':          QA_SKILLS,
+  'quality':     QA_SKILLS,
+  'test':        QA_SKILLS,
+  'security':    QA_SKILLS,
+  'audit':       QA_SKILLS,
+  // Growth aliases
+  'growth':      GROWTH_SKILLS,
+  'marketing':   GROWTH_SKILLS,
+  'seo':         GROWTH_SKILLS,
+  // Knowledge aliases
+  'knowledge':   KNOWLEDGE_SKILLS,
+  'curator':     KNOWLEDGE_SKILLS,
+  'archivist':   KNOWLEDGE_SKILLS,
+  'librarian':   KNOWLEDGE_SKILLS,
+  'wiki':        KNOWLEDGE_SKILLS,
 };
 
 // ============================================================
