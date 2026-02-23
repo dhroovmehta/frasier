@@ -40,16 +40,6 @@
     "updated_at": "2026-02-17T14:14:43.993+00:00"
   },
   {
-    "id": 47,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "strategic_planning",
-    "proficiency": 2,
-    "usage_count": 5,
-    "last_used_at": "2026-02-18T01:34:43.13+00:00",
-    "created_at": "2026-02-18T00:59:51.342472+00:00",
-    "updated_at": "2026-02-18T01:34:43.833+00:00"
-  },
-  {
     "id": 7,
     "agent_id": "agent-sahaquiel-1770840215198",
     "skill_name": "seo_optimization",
@@ -230,26 +220,6 @@
     "updated_at": "2026-02-17T01:43:12.213877+00:00"
   },
   {
-    "id": 12,
-    "agent_id": "agent-gendo-1770840214305",
-    "skill_name": "market_research",
-    "proficiency": 1,
-    "usage_count": 1,
-    "last_used_at": "2026-02-16T22:13:40.925+00:00",
-    "created_at": "2026-02-16T22:13:41.125611+00:00",
-    "updated_at": "2026-02-16T22:13:41.125611+00:00"
-  },
-  {
-    "id": 13,
-    "agent_id": "agent-gendo-1770840214305",
-    "skill_name": "data_analysis",
-    "proficiency": 1,
-    "usage_count": 1,
-    "last_used_at": "2026-02-16T22:13:40.925+00:00",
-    "created_at": "2026-02-16T22:13:41.408206+00:00",
-    "updated_at": "2026-02-16T22:13:41.408206+00:00"
-  },
-  {
     "id": 14,
     "agent_id": "agent-gendo-1770840214305",
     "skill_name": "strategic_planning",
@@ -300,24 +270,24 @@
     "updated_at": "2026-02-17T01:13:32.784+00:00"
   },
   {
-    "id": 3,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "market_research",
-    "proficiency": 3,
-    "usage_count": 15,
-    "last_used_at": "2026-02-17T14:14:42.616+00:00",
-    "created_at": "2026-02-12T18:09:36.839189+00:00",
-    "updated_at": "2026-02-17T14:14:42.616+00:00"
+    "id": 58,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "general_task_execution",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": "2026-02-18T01:30:21.239+00:00",
+    "created_at": "2026-02-18T01:02:44.122036+00:00",
+    "updated_at": "2026-02-18T01:30:21.239+00:00"
   },
   {
-    "id": 4,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "data_analysis",
-    "proficiency": 3,
-    "usage_count": 13,
-    "last_used_at": "2026-02-17T14:14:42.616+00:00",
-    "created_at": "2026-02-12T18:09:37.110235+00:00",
-    "updated_at": "2026-02-17T14:14:42.616+00:00"
+    "id": 47,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "strategic_planning",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": "2026-02-18T01:34:43.13+00:00",
+    "created_at": "2026-02-18T00:59:51.342472+00:00",
+    "updated_at": "2026-02-18T01:34:43.833+00:00"
   },
   {
     "id": 70,
@@ -328,16 +298,6 @@
     "last_used_at": "2026-02-18T01:26:39.145+00:00",
     "created_at": "2026-02-18T01:26:41.934306+00:00",
     "updated_at": "2026-02-18T01:26:41.934306+00:00"
-  },
-  {
-    "id": 49,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "leadership",
-    "proficiency": 2,
-    "usage_count": 7,
-    "last_used_at": "2026-02-18T02:11:41.212+00:00",
-    "created_at": "2026-02-18T00:59:51.785519+00:00",
-    "updated_at": "2026-02-18T02:11:41.212+00:00"
   },
   {
     "id": 5,
@@ -438,16 +398,6 @@
     "last_used_at": "2026-02-18T01:26:39.145+00:00",
     "created_at": "2026-02-18T00:55:23.167238+00:00",
     "updated_at": "2026-02-18T01:26:39.145+00:00"
-  },
-  {
-    "id": 48,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "business_modeling",
-    "proficiency": 1,
-    "usage_count": 4,
-    "last_used_at": "2026-02-18T02:11:41.212+00:00",
-    "created_at": "2026-02-18T00:59:51.555942+00:00",
-    "updated_at": "2026-02-18T02:11:41.212+00:00"
   },
   {
     "id": 46,
@@ -600,6 +550,16 @@
     "updated_at": "2026-02-18T02:12:10.638+00:00"
   },
   {
+    "id": 12,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "market_research",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": "2026-02-16T22:13:40.925+00:00",
+    "created_at": "2026-02-16T22:13:41.125611+00:00",
+    "updated_at": "2026-02-16T22:13:41.125611+00:00"
+  },
+  {
     "id": 68,
     "agent_id": "agent-toji-1770840215950",
     "skill_name": "information_architecture",
@@ -650,14 +610,14 @@
     "updated_at": "2026-02-18T01:34:43.13+00:00"
   },
   {
-    "id": 58,
+    "id": 48,
     "agent_id": "agent-toji-1770840215950",
-    "skill_name": "general_task_execution",
+    "skill_name": "business_modeling",
     "proficiency": 1,
-    "usage_count": 4,
-    "last_used_at": "2026-02-18T01:30:21.239+00:00",
-    "created_at": "2026-02-18T01:02:44.122036+00:00",
-    "updated_at": "2026-02-18T01:30:21.239+00:00"
+    "usage_count": 0,
+    "last_used_at": "2026-02-18T02:11:41.212+00:00",
+    "created_at": "2026-02-18T00:59:51.555942+00:00",
+    "updated_at": "2026-02-18T02:11:41.212+00:00"
   },
   {
     "id": 55,
@@ -668,6 +628,26 @@
     "last_used_at": "2026-02-18T01:34:43.13+00:00",
     "created_at": "2026-02-18T00:59:53.133993+00:00",
     "updated_at": "2026-02-18T01:34:43.13+00:00"
+  },
+  {
+    "id": 3,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "market_research",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": "2026-02-17T14:14:42.616+00:00",
+    "created_at": "2026-02-12T18:09:36.839189+00:00",
+    "updated_at": "2026-02-17T14:14:42.616+00:00"
+  },
+  {
+    "id": 4,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "data_analysis",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": "2026-02-17T14:14:42.616+00:00",
+    "created_at": "2026-02-12T18:09:37.110235+00:00",
+    "updated_at": "2026-02-17T14:14:42.616+00:00"
   },
   {
     "id": 65,
@@ -708,5 +688,445 @@
     "last_used_at": "2026-02-18T02:11:41.212+00:00",
     "created_at": "2026-02-18T02:11:43.164333+00:00",
     "updated_at": "2026-02-18T02:11:43.164333+00:00"
+  },
+  {
+    "id": 13,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "data_analysis",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": "2026-02-16T22:13:40.925+00:00",
+    "created_at": "2026-02-16T22:13:41.408206+00:00",
+    "updated_at": "2026-02-16T22:13:41.408206+00:00"
+  },
+  {
+    "id": 75,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "competitive_intel",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:23.490047+00:00",
+    "updated_at": "2026-02-23T02:16:23.490047+00:00"
+  },
+  {
+    "id": 76,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "deep_research",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:23.490047+00:00",
+    "updated_at": "2026-02-23T02:16:23.490047+00:00"
+  },
+  {
+    "id": 77,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "competitive_analysis",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:23.490047+00:00",
+    "updated_at": "2026-02-23T02:16:23.490047+00:00"
+  },
+  {
+    "id": 78,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "market_sizing",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:23.490047+00:00",
+    "updated_at": "2026-02-23T02:16:23.490047+00:00"
+  },
+  {
+    "id": 79,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "data_storytelling",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:23.490047+00:00",
+    "updated_at": "2026-02-23T02:16:23.490047+00:00"
+  },
+  {
+    "id": 80,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "pricing_research",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:23.490047+00:00",
+    "updated_at": "2026-02-23T02:16:23.490047+00:00"
+  },
+  {
+    "id": 81,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "analytics_design",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:23.490047+00:00",
+    "updated_at": "2026-02-23T02:16:23.490047+00:00"
+  },
+  {
+    "id": 82,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "research_methodology",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:23.490047+00:00",
+    "updated_at": "2026-02-23T02:16:23.490047+00:00"
+  },
+  {
+    "id": 85,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "competitive_intel",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-23T02:16:24.052079+00:00"
+  },
+  {
+    "id": 86,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "deep_research",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-23T02:16:24.052079+00:00"
+  },
+  {
+    "id": 87,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "competitive_analysis",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-23T02:16:24.052079+00:00"
+  },
+  {
+    "id": 88,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "market_sizing",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-23T02:16:24.052079+00:00"
+  },
+  {
+    "id": 89,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "data_storytelling",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-23T02:16:24.052079+00:00"
+  },
+  {
+    "id": 90,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "pricing_research",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-23T02:16:24.052079+00:00"
+  },
+  {
+    "id": 91,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "analytics_design",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-23T02:16:24.052079+00:00"
+  },
+  {
+    "id": 92,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "research_methodology",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-23T02:16:24.052079+00:00"
+  },
+  {
+    "id": 93,
+    "agent_id": "frasier-cos",
+    "skill_name": "general_task_execution",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:57.639255+00:00",
+    "updated_at": "2026-02-23T02:16:57.639255+00:00"
+  },
+  {
+    "id": 95,
+    "agent_id": "test-memory-agent",
+    "skill_name": "general_task_execution",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:16:58.541506+00:00",
+    "updated_at": "2026-02-23T02:16:58.541506+00:00"
+  },
+  {
+    "id": 96,
+    "agent_id": "frasier-cos",
+    "skill_name": "strategic_planning",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:28.921233+00:00",
+    "updated_at": "2026-02-23T02:18:28.921233+00:00"
+  },
+  {
+    "id": 97,
+    "agent_id": "frasier-cos",
+    "skill_name": "business_modeling",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:28.921233+00:00",
+    "updated_at": "2026-02-23T02:18:28.921233+00:00"
+  },
+  {
+    "id": 98,
+    "agent_id": "frasier-cos",
+    "skill_name": "leadership",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:28.921233+00:00",
+    "updated_at": "2026-02-23T02:18:28.921233+00:00"
+  },
+  {
+    "id": 99,
+    "agent_id": "frasier-cos",
+    "skill_name": "product_management",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:28.921233+00:00",
+    "updated_at": "2026-02-23T02:18:28.921233+00:00"
+  },
+  {
+    "id": 100,
+    "agent_id": "frasier-cos",
+    "skill_name": "planning_execution",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:28.921233+00:00",
+    "updated_at": "2026-02-23T02:18:28.921233+00:00"
+  },
+  {
+    "id": 101,
+    "agent_id": "frasier-cos",
+    "skill_name": "decision_frameworks",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:28.921233+00:00",
+    "updated_at": "2026-02-23T02:18:28.921233+00:00"
+  },
+  {
+    "id": 102,
+    "agent_id": "frasier-cos",
+    "skill_name": "startup_analysis",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:28.921233+00:00",
+    "updated_at": "2026-02-23T02:18:28.921233+00:00"
+  },
+  {
+    "id": 103,
+    "agent_id": "frasier-cos",
+    "skill_name": "metrics_kpi",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:28.921233+00:00",
+    "updated_at": "2026-02-23T02:18:28.921233+00:00"
+  },
+  {
+    "id": 104,
+    "agent_id": "frasier-cos",
+    "skill_name": "business_analysis",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:28.921233+00:00",
+    "updated_at": "2026-02-23T02:18:28.921233+00:00"
+  },
+  {
+    "id": 49,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "leadership",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": "2026-02-18T02:11:41.212+00:00",
+    "created_at": "2026-02-18T00:59:51.785519+00:00",
+    "updated_at": "2026-02-18T02:11:41.212+00:00"
+  },
+  {
+    "id": 108,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "product_management",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.103965+00:00",
+    "updated_at": "2026-02-23T02:18:29.103965+00:00"
+  },
+  {
+    "id": 109,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "planning_execution",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.103965+00:00",
+    "updated_at": "2026-02-23T02:18:29.103965+00:00"
+  },
+  {
+    "id": 110,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "decision_frameworks",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.103965+00:00",
+    "updated_at": "2026-02-23T02:18:29.103965+00:00"
+  },
+  {
+    "id": 111,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "startup_analysis",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.103965+00:00",
+    "updated_at": "2026-02-23T02:18:29.103965+00:00"
+  },
+  {
+    "id": 112,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "metrics_kpi",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.103965+00:00",
+    "updated_at": "2026-02-23T02:18:29.103965+00:00"
+  },
+  {
+    "id": 113,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "business_analysis",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.103965+00:00",
+    "updated_at": "2026-02-23T02:18:29.103965+00:00"
+  },
+  {
+    "id": 114,
+    "agent_id": "test-memory-agent",
+    "skill_name": "quality_assurance",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.230069+00:00",
+    "updated_at": "2026-02-23T02:18:29.230069+00:00"
+  },
+  {
+    "id": 115,
+    "agent_id": "test-memory-agent",
+    "skill_name": "security_auditing",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.230069+00:00",
+    "updated_at": "2026-02-23T02:18:29.230069+00:00"
+  },
+  {
+    "id": 116,
+    "agent_id": "test-memory-agent",
+    "skill_name": "test_design",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.230069+00:00",
+    "updated_at": "2026-02-23T02:18:29.230069+00:00"
+  },
+  {
+    "id": 117,
+    "agent_id": "test-memory-agent",
+    "skill_name": "tdd",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.230069+00:00",
+    "updated_at": "2026-02-23T02:18:29.230069+00:00"
+  },
+  {
+    "id": 118,
+    "agent_id": "test-memory-agent",
+    "skill_name": "systematic_debugging",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.230069+00:00",
+    "updated_at": "2026-02-23T02:18:29.230069+00:00"
+  },
+  {
+    "id": 119,
+    "agent_id": "test-memory-agent",
+    "skill_name": "bug_detection",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.230069+00:00",
+    "updated_at": "2026-02-23T02:18:29.230069+00:00"
+  },
+  {
+    "id": 120,
+    "agent_id": "test-memory-agent",
+    "skill_name": "threat_modeling",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.230069+00:00",
+    "updated_at": "2026-02-23T02:18:29.230069+00:00"
+  },
+  {
+    "id": 121,
+    "agent_id": "test-memory-agent",
+    "skill_name": "e2e_testing",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.230069+00:00",
+    "updated_at": "2026-02-23T02:18:29.230069+00:00"
+  },
+  {
+    "id": 122,
+    "agent_id": "test-memory-agent",
+    "skill_name": "code_review_excellence",
+    "proficiency": 1,
+    "usage_count": 0,
+    "last_used_at": null,
+    "created_at": "2026-02-23T02:18:29.230069+00:00",
+    "updated_at": "2026-02-23T02:18:29.230069+00:00"
   }
 ]
