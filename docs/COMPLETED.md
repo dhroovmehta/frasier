@@ -1,6 +1,6 @@
 # Frasier — Completed Features
 
-> Last updated: Feb 22, 2026 (v0.5.0)
+> Last updated: Feb 22, 2026 (v0.6.0)
 
 ---
 
@@ -76,6 +76,21 @@
 - Skills improve with use: more tasks → higher proficiency
 - Cross-training: agents can learn adjacent skills at reduced proficiency
 - `formatSkillsForPrompt()` injects skill context into agent's system prompt
+
+### Expert Methodology Enrichment (v0.6.0)
+- **File:** `scripts/enrich-personas.js` (migration), `src/lib/skills.js` (runtime)
+- 48 skills sourced from Antigravity catalog, vetted through 3-scanner security pipeline + manual review
+- Distilled expert methodologies injected into agent persona prompts:
+  - **Strategy roles:** RICE prioritization, MoSCoW, ADRs, SaaS metrics, unit economics, three-scenario planning
+  - **Research roles:** Multi-step research protocol, Porter's Five Forces, market sizing (TAM/SAM/SOM), data storytelling
+  - **Content roles:** SEO content scoring, PLFS framework, content auditing rubrics, marketing psychology triggers
+  - **Engineer roles:** Clean code principles, architecture patterns (SOLID, DRY, YAGNI), database design, API design scoring
+  - **QA roles:** STRIDE threat modeling, test quality scoring, 80/20 coverage, systematic debugging protocol
+  - **Growth roles:** Programmatic SEO, conversion optimization, A/B testing methodology, keyword strategy
+  - **Knowledge roles:** Documentation architecture, wiki structure, decision records, prose quality scoring
+- ROLE_SKILLS expanded from 3 to 9-11 skills per role with role aliases for flexible matching
+- SKILL_KEYWORDS entries for all 48 new skills enable keyword-based growth tracking
+- Migration is idempotent — checks `<!-- ENRICHED v0.6.0 -->` marker before appending
 
 ---
 

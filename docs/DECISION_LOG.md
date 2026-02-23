@@ -250,3 +250,45 @@ Fallback chain: T3→T2→T1 if higher tier fails.
 **Rationale:** Reusable pattern for all side-effect operations: set the "processed" flag first, execute second. The cost of a missed execution (can retry manually) is far lower than infinite duplicate executions. Applies to any polling-based system with external side effects.
 
 **Trade-offs:** If the system crashes between marking and publishing, the step is never announced. Acceptable — the data exists in the DB and can be re-announced manually.
+
+---
+
+## D-021: Persona Enrichment over Lessons for Upskilling
+
+**Date:** Feb 22, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** All 7 agents produced generic, surface-level output. Two upskilling approaches considered: (A) save skill methodologies as lessons (retrieved top-5 by importance, may be displaced), or (B) inject distilled methodologies directly into agent persona prompts (100% retrieval, always present in every LLM call).
+
+**Decision:** Persona enrichment (B) as primary. Also add skill tracking to ROLE_SKILLS/SKILL_KEYWORDS for growth measurement.
+
+**Rationale:** Persona modifications have 100% retrieval — they're part of the system prompt on every call. Lessons compete for top-5 slots and can be displaced by newer lessons. Expert frameworks need to be consistently present, not intermittently recalled.
+
+**Trade-offs:** Larger system prompts (more tokens per call). Persona is harder to modify surgically than individual lessons. Acceptable because expert methodology is foundational, not situational.
+
+---
+
+## D-022: Skill Security Protocol (4-Scanner Pipeline)
+
+**Date:** Feb 22, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Skills sourced from public GitHub repos could contain malicious code, prompt injection, or data exfiltration. Need a repeatable process to vet skills before installation.
+
+**Decision:** Zero-tolerance 4-scanner pipeline: (1) Snyk mcp-scan, (2) Cisco AI Skill Scanner, (3) SkillAudit API, (4) manual line-by-line review. Any scanner flag = auto-reject.
+
+**Rationale:** Defense in depth — no single scanner catches everything. Manual review as final gate catches semantic attacks that automated tools miss. Protocol documented at `_knowledge/decisions/skill-security-protocol.md`.
+
+**Trade-offs:** Slower skill adoption (each skill takes ~2 min to fully vet). Acceptable — security over speed for code that runs in agent system prompts.
+
+---
+
+## D-023: Role Aliases for Flexible Skill Matching
+
+**Date:** Feb 22, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** `initializeSkills()` matched roles via substring against ROLE_SKILLS keys. Roles like "Chief of Staff / COO" and "Memory System Tester" didn't match `strategy` or `qa` keys, falling back to a single `general_task_execution` skill.
+
+**Decision:** Add role aliases — multiple ROLE_SKILLS keys (`chief`, `coo`, `business`, `test`, `writer`, `editor`, `archivist`, etc.) mapping to the same skill arrays via shared constants.
+
+**Rationale:** Simple, zero-cost, DRY (shared arrays avoid duplication). Works for both `initializeSkills()` in runtime and `enrich-personas.js` migration script.
+
+**Trade-offs:** ROLE_SKILLS object is larger but still a static lookup map. No performance impact.

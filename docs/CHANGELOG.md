@@ -4,6 +4,27 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.6.0] — 2026-02-22 (Agent Upskilling)
+
+### Added
+- **Persona enrichment migration:** `scripts/enrich-personas.js` injects expert methodologies (RICE, MoSCoW, Porter's Five Forces, STRIDE, PLFS, etc.) directly into agent system prompts. Idempotent — safe to re-run.
+- **Expanded skill tracking:** `ROLE_SKILLS` expanded from 3 to 9-11 skills per role (48 security-vetted skills sourced from Antigravity catalog). All skills have `SKILL_KEYWORDS` for keyword-based growth detection.
+- **Role aliases:** `ROLE_SKILLS` keys now include aliases (`chief`, `coo`, `business`, `analyst`, `writer`, `editor`, `test`, `archivist`, etc.) so roles like "Chief of Staff / COO" and "Memory System Tester" match correctly.
+- **Security pipeline:** All 48 candidate skills passed 3-scanner pipeline (Snyk mcp-scan, Cisco AI Skill Scanner, SkillAudit API) + manual line-by-line review before installation.
+
+### Enriched Agents
+- **Frasier** (Chief of Staff): RICE prioritization, MoSCoW, ADRs, SaaS metrics, unit economics
+- **Gendo** (Research Lead): Multi-step research protocol, Porter's Five Forces, market sizing, data storytelling
+- **Sahaquiel** (Research Analyst): Same research methodologies
+- **Toji** (Financial Analyst): Strategy & business analysis frameworks
+- **Rei** (QA Tester): STRIDE threat modeling, test quality scoring, 80/20 coverage, systematic debugging
+
+### Notes
+- 7 agents without personas (Contentron agents + Ritsuko, Kaworu) skipped — script auto-enriches on re-run once personas exist.
+- Skill initialization uses upsert — no duplicate rows if run multiple times.
+
+---
+
 ## [0.5.0] — 2026-02-22 (Contentron Integration)
 
 ### Added
