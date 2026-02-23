@@ -16,15 +16,33 @@ const events = require('./events');
 // Role matching is case-insensitive substring match.
 
 const ROLE_SKILLS = {
-  'research':    ['market_research', 'data_analysis', 'competitive_intel'],
-  'strategy':    ['strategic_planning', 'business_modeling', 'leadership'],
-  'content':     ['copywriting', 'social_media', 'brand_storytelling'],
-  'engineer':    ['software_engineering', 'system_architecture', 'debugging'],
-  'qa':          ['quality_assurance', 'security_auditing', 'test_design'],
-  'growth':      ['seo_optimization', 'campaign_management', 'funnel_design'],
-  'marketing':   ['seo_optimization', 'campaign_management', 'funnel_design'],
-  'knowledge':   ['documentation', 'knowledge_synthesis', 'information_architecture'],
-  'curator':     ['documentation', 'knowledge_synthesis', 'information_architecture']
+  'research':    ['market_research', 'data_analysis', 'competitive_intel',
+                  'deep_research', 'competitive_analysis', 'market_sizing', 'data_storytelling',
+                  'pricing_research', 'analytics_design', 'research_methodology'],
+  'strategy':    ['strategic_planning', 'business_modeling', 'leadership',
+                  'product_management', 'planning_execution', 'decision_frameworks',
+                  'startup_analysis', 'metrics_kpi', 'business_analysis'],
+  'content':     ['copywriting', 'social_media', 'brand_storytelling',
+                  'seo_content_writing', 'marketing_psychology', 'content_planning',
+                  'content_marketing', 'email_marketing', 'content_auditing'],
+  'engineer':    ['software_engineering', 'system_architecture', 'debugging',
+                  'fullstack_development', 'architecture_patterns', 'backend_architecture',
+                  'clean_code', 'error_handling', 'database_architecture', 'api_design', 'code_review'],
+  'qa':          ['quality_assurance', 'security_auditing', 'test_design',
+                  'tdd', 'systematic_debugging', 'bug_detection', 'threat_modeling',
+                  'e2e_testing', 'code_review_excellence'],
+  'growth':      ['seo_optimization', 'campaign_management', 'funnel_design',
+                  'programmatic_seo', 'growth_tooling', 'pricing_strategy',
+                  'ab_testing', 'launch_strategy', 'keyword_strategy', 'conversion_optimization'],
+  'marketing':   ['seo_optimization', 'campaign_management', 'funnel_design',
+                  'programmatic_seo', 'growth_tooling', 'pricing_strategy',
+                  'ab_testing', 'launch_strategy', 'keyword_strategy', 'conversion_optimization'],
+  'knowledge':   ['documentation', 'knowledge_synthesis', 'information_architecture',
+                  'docs_architecture', 'wiki_architecture', 'wiki_research',
+                  'doc_templates', 'data_storytelling', 'decision_records', 'prose_quality'],
+  'curator':     ['documentation', 'knowledge_synthesis', 'information_architecture',
+                  'docs_architecture', 'wiki_architecture', 'wiki_research',
+                  'doc_templates', 'data_storytelling', 'decision_records', 'prose_quality']
 };
 
 // ============================================================
@@ -55,7 +73,68 @@ const SKILL_KEYWORDS = {
   documentation:             ['document', 'wiki', 'readme', 'guide', 'manual', 'reference'],
   knowledge_synthesis:       ['summarize', 'synthesize', 'distill', 'overview', 'digest', 'briefing'],
   information_architecture:  ['organize', 'catalog', 'index', 'taxonomy', 'structure', 'categorize'],
-  general_task_execution:    ['task', 'execute', 'complete', 'deliver', 'work']
+  general_task_execution:    ['task', 'execute', 'complete', 'deliver', 'work'],
+
+  // === NEW SKILLS (v0.6.0 — Agent Upskill) ===
+
+  // Jet (Strategy/COO)
+  product_management:        ['product', 'prioritize', 'backlog', 'feature', 'user story', 'rice', 'moscow'],
+  planning_execution:        ['checkpoint', 'milestone', 'scope', 'action item', 'deliverable', 'blocker'],
+  decision_frameworks:       ['decision', 'adr', 'trade-off', 'pros cons', 'evaluate', 'option'],
+  startup_analysis:          ['startup', 'tam', 'sam', 'som', 'unit economics', 'cac', 'ltv', 'payback'],
+  metrics_kpi:               ['kpi', 'dashboard', 'okr', 'north star', 'burn rate', 'rule of 40'],
+  business_analysis:         ['cohort', 'retention', 'churn', 'arpu', 'balanced scorecard', 'scenario'],
+
+  // Edward (Research)
+  deep_research:             ['investigation', 'citation', 'source', 'evidence', 'primary source', 'due diligence'],
+  competitive_analysis:      ['porter', 'five forces', 'positioning', 'differentiation', 'moat'],
+  market_sizing:             ['market size', 'addressable market', 'bottom-up', 'top-down', 'triangulation'],
+  pricing_research:          ['willingness to pay', 'van westendorp', 'conjoint', 'value metric', 'tier design'],
+  analytics_design:          ['event taxonomy', 'measurement', 'attribution', 'tracking plan', 'funnel analysis'],
+  research_methodology:      ['methodology', 'rigor', 'hypothesis', 'systematic', 'academic', 'peer review'],
+
+  // Faye (Content)
+  seo_content_writing:       ['e-e-a-t', 'keyword density', 'readability', 'search intent', 'serp feature'],
+  marketing_psychology:      ['loss aversion', 'anchoring', 'social proof', 'scarcity', 'ikea effect', 'behavioral'],
+  content_planning:          ['content pillar', 'topic cluster', 'editorial calendar', 'internal linking'],
+  content_marketing:         ['distribution', 'omnichannel', 'content roi', 'attribution', 'repurpose'],
+  email_marketing:           ['email sequence', 'drip', 'nurture', 'open rate', 'click rate', 'subject line'],
+  content_auditing:          ['content audit', 'content score', 'freshness', 'thin content', 'content gap'],
+
+  // Spike (Engineering)
+  fullstack_development:     ['fullstack', 'frontend', 'backend', 'next.js', 'react', 'node', 'supabase'],
+  architecture_patterns:     ['clean architecture', 'hexagonal', 'ddd', 'domain driven', 'bounded context'],
+  backend_architecture:      ['circuit breaker', 'saga', 'cqrs', 'bulkhead', 'strangler', 'microservice'],
+  clean_code:                ['srp', 'solid', 'code smell', 'refactor', 'maintainability', 'demeter'],
+  error_handling:            ['retry', 'graceful degradation', 'fallback', 'either type', 'result type'],
+  database_architecture:     ['normalization', 'denormalization', 'indexing', 'migration', 'cache strategy'],
+  api_design:                ['rest', 'graphql', 'versioning', 'pagination', 'rate limit', 'openapi'],
+  code_review:               ['code review', 'pull request', 'static analysis', 'sonarqube', 'semgrep'],
+
+  // Ein (QA)
+  tdd:                       ['red green refactor', 'test first', 'tdd', 'test driven'],
+  systematic_debugging:      ['root cause', 'bisect', 'reproduce', 'isolate', 'hypothesis testing'],
+  bug_detection:             ['attack surface', 'edge case', 'boundary', 'race condition', 'null check'],
+  threat_modeling:           ['stride', 'pasta', 'attack tree', 'threat model', 'cvss', 'dread'],
+  e2e_testing:               ['playwright', 'cypress', 'e2e', 'end to end', 'browser test', 'smoke test'],
+  code_review_excellence:    ['blocking', 'nit', 'suggestion', 'approval', 'request changes'],
+
+  // Vicious (Growth)
+  programmatic_seo:          ['programmatic', 'template page', 'dynamic page', 'head term', 'long tail'],
+  growth_tooling:            ['free tool', 'lead magnet', 'calculator', 'generator', 'gated content'],
+  pricing_strategy:          ['freemium', 'value based', 'usage based', 'per seat', 'good better best'],
+  ab_testing:                ['a/b test', 'experiment', 'hypothesis', 'statistical significance', 'mde', 'control'],
+  launch_strategy:           ['product hunt', 'beta', 'early access', 'waitlist', 'go to market', 'gtm'],
+  keyword_strategy:          ['keyword cluster', 'entity', 'lsi', 'search volume', 'difficulty', 'intent'],
+  conversion_optimization:   ['cro', 'form optimization', 'friction', 'drop-off', 'field validation'],
+
+  // Julia (Knowledge)
+  docs_architecture:         ['doc structure', 'reading path', 'progressive disclosure', 'audience level'],
+  wiki_architecture:         ['wiki', 'hierarchy', 'navigation', 'cross-reference', 'onboarding path'],
+  wiki_research:             ['investigate', 'trace', 'dependency map', 'pattern identification'],
+  doc_templates:             ['template', 'jsdoc', 'tsdoc', 'api docs', 'keep a changelog', 'llms.txt'],
+  decision_records:          ['adr', 'madr', 'rfc', 'y-statement', 'deprecation', 'status lifecycle'],
+  prose_quality:             ['prose', 'clarity', 'concise', 'active voice', 'ai tics', 'filler words']
 };
 
 // ============================================================
