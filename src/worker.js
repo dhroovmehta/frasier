@@ -18,6 +18,8 @@ const web = require('./lib/web');
 const social = require('./lib/social');
 const agents = require('./lib/agents');
 const context = require('./lib/context');
+const pipeline = require('./lib/pipeline');
+const approachMemory = require('./lib/approach_memory');
 const supabase = require('./lib/supabase');
 
 const POLL_INTERVAL_MS = 10 * 1000; // 10 seconds
@@ -118,50 +120,34 @@ async function processNextStep() {
       }
     }
 
-    // Call the LLM with enriched context and potentially upgraded tier
-    const result = await models.callLLM({
-      systemPrompt: promptData.systemPrompt,
+    // DEEP WORK PIPELINE: Multi-phase execution replaces the old single LLM call.
+    // WHY: Single-shot calls produced hallucinated, surface-level output. The pipeline
+    // forces: decompose → web research → synthesize → self-critique → (revise if needed).
+    // Config determines which phases run based on task type.
+    const pipelineConfig = determinePipelineConfig(step, agentRole);
+    console.log(`[worker] Step #${step.id}: Pipeline config: ${JSON.stringify(pipelineConfig)}`);
+
+    const pipelineResult = await pipeline.execute({
+      step,
+      promptData,
       userMessage,
-      agentId: step.assigned_agent_id,
-      missionStepId: step.id,
-      forceTier: effectiveTier
+      effectiveTier,
+      config: pipelineConfig
     });
 
-    if (result.error) {
-      await missions.failStep(step.id, result.error);
+    if (pipelineResult.error) {
+      await missions.failStep(step.id, pipelineResult.error);
       await events.logEvent({
         eventType: 'task_failed',
         agentId: step.assigned_agent_id,
         severity: 'error',
-        description: `Step #${step.id} failed: ${result.error}`,
+        description: `Step #${step.id} failed: ${pipelineResult.error}`,
         data: { stepId: step.id }
       });
       return;
     }
 
-    // WEB ACCESS: Check if the agent requested live data via [WEB_SEARCH:] or [WEB_FETCH:] tags
-    // WHY: Agents can't browse the web directly. They embed tags in their output,
-    // we resolve them, then re-call the LLM with the live data injected.
-    let finalContent = result.content;
-    const webResolution = await web.resolveWebTags(result.content);
-
-    if (webResolution.hasWebTags) {
-      console.log(`[worker] Step #${step.id}: Agent requested ${webResolution.results.length} web resource(s). Fetching...`);
-      const webContext = web.formatWebResults(webResolution.results);
-
-      const followUp = await models.callLLM({
-        systemPrompt: promptData.systemPrompt,
-        userMessage: `${step.description}\n\n${webContext}\n\nUsing the live web data above, complete the original task. Incorporate the real data into your response. Do NOT include [WEB_SEARCH] or [WEB_FETCH] tags in this response.`,
-        agentId: step.assigned_agent_id,
-        missionStepId: step.id,
-        forceTier: step.model_tier
-      });
-
-      if (followUp.content) {
-        finalContent = followUp.content;
-        console.log(`[worker] Step #${step.id}: Web-enriched response generated.`);
-      }
-    }
+    let finalContent = pipelineResult.content;
 
     // SOCIAL MEDIA: Check if the agent wants to post content via [SOCIAL_POST:] tags
     // WHY: Agents (especially Faye) can create social content and queue it to Buffer.
@@ -185,17 +171,19 @@ async function processNextStep() {
     // Track skill usage — agent grows through doing
     await skills.trackSkillUsage(step.assigned_agent_id, step.description);
 
-    // LESSON GENERATION: Every 5th task, the agent reflects and distills a lesson.
-    // WHY: Task memories are raw data. Lessons are distilled wisdom that persists
-    // in every future prompt — this is how agents actually get smarter over time.
-    await maybeGenerateLesson(step.assigned_agent_id, step.description, finalContent, promptData);
+    // LESSON + APPROACH MEMORY: Extract lesson from self-critique (no extra LLM call)
+    // and save approach memory for future task decomposition.
+    // WHY: Old system only learned every 5th task via an extra LLM call.
+    // Now every task learns from its own self-critique, for free.
+    await generateLessonFromCritique(step, pipelineResult, topicTags);
+    await saveApproachMemory(step, pipelineResult, topicTags);
 
     await events.logEvent({
       eventType: 'task_completed',
       agentId: step.assigned_agent_id,
       severity: 'info',
-      description: `Step #${step.id} completed (${result.model}, ${result.tier})`,
-      data: { stepId: step.id, model: result.model, tier: result.tier }
+      description: `Step #${step.id} completed (${effectiveTier}, critique: ${pipelineResult.critiqueScore || 'n/a'}, revised: ${pipelineResult.revised})`,
+      data: { stepId: step.id, tier: effectiveTier, critiqueScore: pipelineResult.critiqueScore, revised: pipelineResult.revised, phases: pipelineResult.phases?.length }
     });
 
     console.log(`[worker] Step #${step.id} completed. Result saved, awaiting review.`);
@@ -604,6 +592,88 @@ ${expertiseAddition}`;
   } catch (err) {
     // Upskilling is non-critical — never fail the review process over it
     console.error(`[worker] Upskill failed for ${agentId}: ${err.message}`);
+  }
+}
+
+// ============================================================
+// DEEP WORK PIPELINE HELPERS
+// ============================================================
+
+/**
+ * Determine pipeline configuration based on step type and agent role.
+ * WHY: Research tasks need full pipeline, engineering tasks skip web research,
+ * and trivial tasks skip the pipeline entirely.
+ */
+function determinePipelineConfig(step, agentRole) {
+  const desc = (step.description || '').toLowerCase();
+  const role = (agentRole || '').toLowerCase();
+
+  // Simple/trivial tasks — skip entire pipeline (legacy single-shot)
+  const simplePatterns = ['greet', 'respond to', 'acknowledge', 'thank', 'confirm'];
+  if (simplePatterns.some(p => desc.startsWith(p)) && desc.length < 100) {
+    return { skipPipeline: true };
+  }
+
+  // Engineering tasks — skip web research
+  if (role.includes('engineer') || ['code', 'build', 'deploy', 'api', 'database', 'debug', 'fix'].some(kw => desc.includes(kw))) {
+    return { skipResearch: true };
+  }
+
+  // Content/creative tasks — skip web research
+  if (role.includes('content') || role.includes('creative')) {
+    return { skipResearch: true };
+  }
+
+  // Default: full pipeline (research, analysis, strategy, etc.)
+  return {};
+}
+
+/**
+ * Extract a lesson from the pipeline's self-critique and save it.
+ * WHY: Old system needed an extra LLM call every 5th task. Now every task
+ * learns from its own critique output — zero additional cost.
+ */
+async function generateLessonFromCritique(step, pipelineResult, topicTags) {
+  try {
+    if (!pipelineResult.critiqueLesson) return;
+
+    await memory.saveLesson({
+      agentId: step.assigned_agent_id,
+      lesson: pipelineResult.critiqueLesson,
+      context: `Self-critique after task: "${step.description.substring(0, 150)}" (score: ${pipelineResult.critiqueScore}/5)`,
+      category: topicTags[0] || 'general',
+      importance: 7
+    });
+
+    console.log(`[worker] Critique lesson saved for ${step.assigned_agent_id}: "${pipelineResult.critiqueLesson.substring(0, 80)}..."`);
+  } catch (err) {
+    // Non-critical — never fail the task over lesson extraction
+    console.error(`[worker] Critique lesson failed for ${step.assigned_agent_id}: ${err.message}`);
+  }
+}
+
+/**
+ * Save approach memory after a step completes — "what worked before."
+ * WHY: Future decompositions benefit from knowing which search queries
+ * and task breakdowns produced high-scoring results on similar tasks.
+ */
+async function saveApproachMemory(step, pipelineResult, topicTags) {
+  try {
+    if (!pipelineResult.critiqueScore) return; // No critique = no approach to save
+
+    await approachMemory.save({
+      agentId: step.assigned_agent_id,
+      missionStepId: step.id,
+      taskSummary: step.description,
+      topicTags,
+      decomposition: {}, // Pipeline doesn't expose decomposition details yet
+      searchQueries: [],
+      effectiveQueries: [],
+      critiqueScore: pipelineResult.critiqueScore
+    });
+  } catch (err) {
+    // Non-critical — never fail the task over approach memory
+    console.error(`[worker] Approach memory save failed for step #${step.id}: ${err.message}`);
   }
 }
 

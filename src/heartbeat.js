@@ -18,6 +18,7 @@ const memory = require('./lib/memory');
 const models = require('./lib/models');
 const events = require('./lib/events');
 const policy = require('./lib/policy');
+const autonomy = require('./lib/autonomy');
 const skills = require('./lib/skills');
 const alerts = require('./lib/alerts');
 const health = require('./lib/health');
@@ -617,6 +618,20 @@ async function processApprovals() {
 
   for (const step of stepsNeedingReview) {
     try {
+      // AUTONOMY CHECK: Auto-approve intermediate steps with high critique scores.
+      // WHY: Only the final deliverable needs human review. Intermediate steps
+      // with self-critique scores >= 4.0 auto-approve so missions flow autonomously.
+      const autoResult = await autonomy.shouldAutoApprove(step);
+      if (autoResult.autoApprove) {
+        await missions.approveStep(step.id);
+        console.log(`[heartbeat] Step #${step.id} auto-approved (${autoResult.reason})`);
+        continue;
+      }
+      if (autoResult.qaOnly) {
+        console.log(`[heartbeat] Step #${step.id}: QA-only review (${autoResult.reason})`);
+        // Fall through to approval creation, but skip Team Lead below
+      }
+
       // Get the team for this step's mission
       const { data: missionData } = await require('./lib/supabase')
         .from('missions')

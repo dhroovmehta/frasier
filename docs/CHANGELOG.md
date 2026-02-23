@@ -4,6 +4,32 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.7.0] — 2026-02-23 (Deep Work Pipeline)
+
+### Added
+- **Deep Work Pipeline (`src/lib/pipeline.js`):** Multi-phase execution engine replacing single-shot LLM calls. Every task now follows: decompose → web research → synthesize → self-critique → (revise if score < 3/5). Configurable per task type.
+- **Approach Memory (`src/lib/approach_memory.js`):** "What worked before" — agents accumulate judgment. Past decompositions and search queries that scored well are injected into future task breakdowns. Zero additional LLM calls.
+- **Autonomous Approval (`src/lib/autonomy.js`):** Policy-driven auto-approval. Intermediate steps with critique score ≥ 4.0 auto-approve; ≥ 3.0 get QA-only review; final steps always get full QA → Team Lead review.
+- **PRD:** `docs/PRD_DEEP_WORK_PIPELINE.md` — full requirements, architecture, cost impact.
+- **SQL Migration:** `sql/004_deep_work_pipeline.sql` — `pipeline_phases` and `approach_memory` tables + autonomy policy.
+- **TDD Tests:** 41 new tests across 3 test suites (`tests/deep-work/`).
+
+### Modified
+- **`src/worker.js`:** Single LLM call replaced with `pipeline.execute()`. Lesson generation now extracts from self-critique (every task, no extra LLM call). Approach memory saved after every step.
+- **`src/heartbeat.js`:** Autonomy check at top of `processApprovals()` — auto-approves intermediate steps with high critique scores.
+
+### Cost Impact
+- Per-step cost: $0.001-0.02 → $0.004-0.05 (3-4 LLM calls instead of 1)
+- Weekly cost: $0.03-0.30 → $0.15-0.75 (at 2-5 missions/week)
+- Brave Search: ~240 queries/month (free tier allows 2,000)
+
+### Notes
+- No new PM2 processes, no new npm dependencies, 1GB VPS safe.
+- All 210 existing tests continue to pass (zero regressions).
+- Pipeline modules designed for extraction to other projects (Phase 6).
+
+---
+
 ## [0.6.0] — 2026-02-22 (Agent Upskilling)
 
 ### Added
