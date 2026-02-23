@@ -1,6 +1,56 @@
 # Frasier — Completed Features
 
-> Last updated: Feb 22, 2026 (v0.6.0)
+> Last updated: Feb 23, 2026 (v0.7.0)
+
+---
+
+## Deep Work Pipeline (v0.7.0)
+
+### Multi-Phase Task Execution
+- **File:** `src/lib/pipeline.js` (605 lines)
+- Replaces single-shot LLM call with structured 5-phase pipeline
+- **Phase 1 — DECOMPOSE (tier1):** Breaks task into 2-4 sub-questions + web search queries
+- **Phase 2 — RESEARCH (no LLM):** Executes search queries via `web.searchWeb()` + fetches top pages via `web.fetchPage()`. Capped at 8 fetches per step (1GB VPS safe)
+- **Phase 3 — SYNTHESIZE (step's tier):** Full agent prompt + memory + research data → actual deliverable with citations
+- **Phase 4 — SELF-CRITIQUE (tier1):** Agent evaluates own work on 1-5 scale, identifies gaps, extracts lesson
+- **Phase 5 — REVISE (conditional):** Only fires if critique < 3/5, capped at 1 attempt (prevents loops)
+- Configurable per task type:
+  - `skipPipeline: true` → simple/trivial tasks (legacy single-shot)
+  - `skipResearch: true` → engineering/creative tasks (decompose + synthesize + critique)
+  - Default: full pipeline for research/analysis/strategy
+- All phases logged to `pipeline_phases` table with timing, tokens, and scores
+
+### Approach Memory ("What Worked Before")
+- **File:** `src/lib/approach_memory.js` (139 lines)
+- After every completed step, saves: task summary, topic tags, decomposition, search queries, effective queries, critique score
+- Before decomposing a new task, retrieves similar past approaches by topic tag overlap (PostgreSQL GIN index)
+- Agents accumulate judgment about *how to approach* tasks, not just results
+- Zero additional LLM calls — pure database retrieval
+- Only retrieves own agent's approaches (no cross-agent contamination)
+
+### Autonomous Step Approval
+- **File:** `src/lib/autonomy.js` (135 lines)
+- Policy-driven auto-approval at top of `processApprovals()` in heartbeat
+- Critique score ≥ 4.0 on intermediate step → auto-approve (skip all review)
+- Critique score ≥ 3.0 on intermediate step → QA-only (skip Team Lead)
+- Final step → always full QA + Team Lead review
+- Tier3 step → always full review
+- Missing critique → full review (backward compatible)
+- Configurable via `policy` table (`autonomy` row) — thresholds adjustable without code changes
+
+### Database (SQL Migration 004)
+- **File:** `sql/004_deep_work_pipeline.sql`
+- `pipeline_phases` table: audit trail for every phase of every step execution
+- `approach_memory` table: accumulated approach judgment per agent
+- Autonomy policy row in existing `policy` table
+- RLS + service_role policies on both tables
+
+### Tests
+- 41 new tests across 3 suites in `tests/deep-work/`
+- `pipeline.test.js` (22 tests): full flow, skip configs, error handling, malformed JSON
+- `approach-memory.test.js` (10 tests): save, find, format, agent isolation
+- `autonomy.test.js` (9 tests): auto-approve, QA-only, full review, policy disabled, backward compat
+- Total: 210 tests across 16 suites, zero regressions
 
 ---
 
@@ -24,10 +74,10 @@
 ### Tiered LLM Routing
 - **File:** `src/lib/models.js`
 - Tier 1 (MiniMax via OpenRouter): default for all tasks, cheapest
-- Tier 2 (Manus): complex tasks detected by keywords (strategy, analysis, etc.)
-- Tier 3 (Claude Opus via OpenRouter): emergency only, requires Zero's approval via `!approve`
+- Tier 2 (Claude Sonnet 4.5 via OpenRouter): complex tasks detected by keywords (strategy, analysis, research, final steps)
+- Tier 3 (Claude Opus via OpenRouter): high-stakes deliverables (PRDs, design docs, executive reports) — auto-routes by keyword, no approval needed
+- Fallback chain: T3→T2→T1 if higher tier fails
 - Auto-retry: Tier 1 retries once after 5s on failure
-- Manus credit exhaustion triggers Tier 3 escalation event → Discord alert to Zero
 
 ---
 

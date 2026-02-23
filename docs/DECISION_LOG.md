@@ -292,3 +292,64 @@ Fallback chain: T3→T2→T1 if higher tier fails.
 **Rationale:** Simple, zero-cost, DRY (shared arrays avoid duplication). Works for both `initializeSkills()` in runtime and `enrich-personas.js` migration script.
 
 **Trade-offs:** ROLE_SKILLS object is larger but still a static lookup map. No performance impact.
+
+---
+
+## D-024: Deep Work Pipeline — Multi-Phase Execution Over Single-Shot LLM
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Agents made exactly 1 LLM call per task with no mandatory web research, no self-critique, and no revision loop. Research tasks produced shallow, un-cited deliverables. Worker had no mechanism to verify or improve its own output before submitting.
+
+**Decision:** Replace single-shot LLM call with a structured 5-phase pipeline: decompose → research → synthesize → self-critique → revise (conditional). Configurable per task type.
+
+**Rationale:**
+- Decompose breaks complex tasks into sub-questions + search queries (cheaper tier1 call)
+- Research phase uses web search + page fetch (no LLM cost, real data)
+- Synthesize produces deliverable with full agent persona + research context
+- Self-critique evaluates on 1-5 scale and extracts a lesson (tier1, no extra prompt engineering)
+- Revise only fires if critique < 3/5, capped at 1 attempt (prevents infinite loops)
+- Simple tasks skip pipeline entirely (`skipPipeline: true`)
+- Engineering/creative tasks skip research (`skipResearch: true`)
+
+**Trade-offs:** 3-4 LLM calls per step instead of 1. Per-step cost: $0.001-0.02 → $0.004-0.05. Web fetches capped at 8 per step for 1GB VPS safety. Phases run sequentially (no parallelism).
+
+**Files:** `src/lib/pipeline.js`, `src/worker.js`
+
+---
+
+## D-025: Approach Memory — Agents Accumulate Judgment
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Every task decomposition started from scratch. An agent that had successfully researched "AI tutoring platforms" last week would decompose a similar task identically to an agent with zero experience. No mechanism to learn *how to approach* tasks, only *what* the results were.
+
+**Decision:** `approach_memory` table stores completed approaches (task summary, topic tags, decomposition, search queries, effective queries, critique score). Before decomposing a new task, the pipeline retrieves similar past approaches by topic tag overlap and injects them as hints.
+
+**Rationale:** Zero additional LLM calls — pure PostgreSQL retrieval via GIN-indexed array overlap. Agents accumulate judgment about *how to think about* tasks, not just task results. Only the agent's own approaches are retrieved (no cross-agent contamination).
+
+**Trade-offs:** Additional DB query per decompose phase. Approach quality depends on critique accuracy. GIN index adds slight write overhead.
+
+**Files:** `src/lib/approach_memory.js`, `sql/004_deep_work_pipeline.sql`
+
+---
+
+## D-026: Autonomous Step Approval — Policy-Driven Auto-Approve
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Every completed step went through full QA → Team Lead review, regardless of quality or importance. Intermediate steps in a 5-step mission created 10 review cycles, even when the step was clearly high-quality. This bottlenecked throughput and wasted LLM budget on unnecessary reviews.
+
+**Decision:** Policy-driven autonomy in `processApprovals()`:
+- Critique score ≥ 4.0 on intermediate step → auto-approve (skip all review)
+- Critique score ≥ 3.0 on intermediate step → QA-only (skip Team Lead)
+- Final step → always full QA + Team Lead review
+- Tier3 step → always full review
+- Missing critique → full review (backward compatible)
+- Configurable via `policy` table row (thresholds, enable/disable)
+
+**Rationale:** High-quality intermediate work doesn't need human review. Final deliverables always get full scrutiny. Policy-driven means thresholds are adjustable without code changes.
+
+**Trade-offs:** Risk of auto-approving a step that looks good by score but has domain errors. Mitigated: final step always reviewed, and approach memory captures quality trends over time.
+
+**Files:** `src/lib/autonomy.js`, `src/heartbeat.js`, `sql/004_deep_work_pipeline.sql`

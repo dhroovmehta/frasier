@@ -1,9 +1,9 @@
 # Product Requirements Document: Frasier
 
-**Version:** 1.1
-**Date:** February 17, 2026
-**Author:** Zero (Founder) with Kai (Technical Lead)
-**Status:** Live — Quality Overhaul (v0.4.0) shipped Feb 17, 2026
+**Version:** 1.2
+**Date:** February 23, 2026
+**Author:** Zero (Founder) with Frasier (Technical Lead)
+**Status:** Live — Deep Work Pipeline (v0.7.0) shipped Feb 23, 2026
 
 ---
 
@@ -1556,7 +1556,7 @@ Founder is non-technical but needs to run commands on VPS. Initial instructions 
 
 ## Future Roadmap
 
-> **Status as of Feb 17, 2026:** Phases 2-3 complete, autonomous lifecycle operational (v0.4.1). See `COMPLETED.md` for details.
+> **Status as of Feb 23, 2026:** v0.7.0 live. Deep work pipeline, approach memory, autonomous approval, agent upskilling all shipped. See `COMPLETED.md` for details.
 
 ### COMPLETED — Phase 2: Smart Routing & Multi-Agent Operations (v0.2.0–v0.3.0)
 - Smart routing via keyword matching + cross-team agent search
@@ -1581,8 +1581,19 @@ Founder is non-technical but needs to run commands on VPS. Initial instructions 
 - Announcement duplicate prevention: optimistic flagging prevents infinite Notion/Drive re-publishes on Supabase errors
 - OpenRouter model ID fix: T2/T3 now correctly reach Claude Sonnet 4.5 and Opus (Decisions D-018 through D-020)
 
+### COMPLETED — Phase 3: Agent Upskilling (v0.6.0)
+- Expert methodology enrichment: RICE, MoSCoW, Porter's Five Forces, STRIDE, PLFS injected into agent personas
+- 48 security-vetted skills across 9-11 per role with keyword-based growth tracking
+- Role aliases for flexible skill matching
+
+### COMPLETED — Phase 3.5: Deep Work Pipeline (v0.7.0)
+- Multi-phase execution: decompose → web research → synthesize → self-critique → revise
+- Approach memory: agents accumulate judgment about how to approach tasks
+- Autonomous step approval: policy-driven auto-approve for high-quality intermediate steps
+- 41 new tests (210 total), zero regressions
+- Cost impact: $0.004-0.05/step (up from $0.001-0.02), Brave Search ~240 queries/month (free tier: 2,000)
+
 ### NEXT — Agent Social Dynamics
-**Timeline:** Feb 18-21, 2026
 
 **Features:**
 - **Conversation scheduling:** 10-15 agent conversations per day (debate, brainstorm, mentoring, watercooler)
@@ -1832,6 +1843,7 @@ pm2 resurrect
 |---------|------|--------|---------|
 | 1.0 | Feb 11, 2026 | Kai | Initial comprehensive PRD created from conversation history |
 | 1.1 | Feb 17, 2026 | Kael | Updated LLM tiers (MiniMax/Sonnet/Opus), added Quality Overhaul decisions (10-14), updated roadmap, noted Frasier as CoS |
+| 1.2 | Feb 23, 2026 | Frasier | Added Deep Work Pipeline (v0.7.0), agent upskilling (v0.6.0), approach memory, autonomous approval to roadmap |
 
 ---
 

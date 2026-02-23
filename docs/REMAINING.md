@@ -1,11 +1,13 @@
 # Frasier — Remaining Features
 
-> Last updated: Feb 17, 2026 (evening)
+> Last updated: Feb 23, 2026 (v0.7.0)
 > Priority: ranked by impact on "agents feel alive" goal
 >
-> **Note (Feb 17 AM):** System Overhaul fixed 4 critical failures: roster injection, context enrichment + persona-as-rubric, project lifecycle, smart routing + gap-fill hiring.
+> **Note (Feb 23):** Deep Work Pipeline (v0.7.0) shipped: multi-phase execution (decompose → research → synthesize → critique → revise), approach memory, autonomous step approval. 210 tests passing.
 >
-> **Note (Feb 17 PM):** Quality Overhaul (5 phases, 144 tests) fixed: wrong LLM tier (Manus→Sonnet 4.5), meta-instructions ("here's what to do" → "YOU ARE the expert"), hardcoded roles (→ dynamic LLM-based), no industry personas (→ project-context generation), generalist reviews (→ domain expert routing). See `COMPLETED.md` for full details.
+> **Note (Feb 22):** Agent Upskilling (v0.6.0) shipped: expert methodology enrichment, expanded skill tracking, role aliases.
+>
+> **Note (Feb 17 PM):** Quality Overhaul (v0.4.0) fixed: wrong LLM tier, meta-instructions, hardcoded roles, no industry personas, generalist reviews. See `COMPLETED.md` for full details.
 
 ---
 
