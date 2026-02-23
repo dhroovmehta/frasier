@@ -242,11 +242,29 @@ async function enrichAllAgents() {
     const roleLower = (agent.role || '').toLowerCase();
     console.log(`\n[enrich] Processing: ${agent.display_name || agent.id} (role: ${agent.role})`);
 
-    // Find matching enrichment by checking if role contains any key
+    // Find matching enrichment by role keywords
+    // Maps role substrings to enrichment keys for flexible matching
+    const ROLE_MAP = [
+      // Strategy enrichment
+      { patterns: ['strategy', 'chief', 'coo', 'lead', 'strategist', 'business', 'financial'], key: 'strategy' },
+      // Research enrichment
+      { patterns: ['research', 'analyst', 'intelligence'], key: 'research' },
+      // Content enrichment
+      { patterns: ['content', 'copy', 'writer', 'editor', 'storytell', 'newsletter'], key: 'content' },
+      // Engineer enrichment
+      { patterns: ['engineer', 'developer', 'full-stack', 'fullstack', 'backend', 'frontend', 'architect'], key: 'engineer' },
+      // QA enrichment
+      { patterns: ['qa', 'quality', 'test', 'security', 'audit'], key: 'qa' },
+      // Growth enrichment
+      { patterns: ['growth', 'marketing', 'seo', 'funnel', 'campaign'], key: 'growth' },
+      // Knowledge enrichment
+      { patterns: ['knowledge', 'documentation', 'curator', 'librarian', 'archivist', 'wiki'], key: 'knowledge' },
+    ];
+
     let enrichment = null;
-    for (const [key, value] of Object.entries(ENRICHMENTS)) {
-      if (value && roleLower.includes(key)) {
-        enrichment = value;
+    for (const mapping of ROLE_MAP) {
+      if (mapping.patterns.some(p => roleLower.includes(p))) {
+        enrichment = ENRICHMENTS[mapping.key];
         break;
       }
     }
