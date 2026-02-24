@@ -4,6 +4,64 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-020: model_usage FK violation — agentId='system' not in agents table
+
+**Date:** Feb 24, 2026 | **Severity:** Low | **Status:** Fixed (v0.9.4)
+
+**Symptom:** `model_usage_agent_id_fkey` constraint failure during heartbeat's LLM title polishing. `logModelUsage()` insert rejected.
+
+**Root Cause:** `polishTitleAndDescription()` in `linear.js` calls `callLLM` with `agentId: 'system'`. The `model_usage` table has a FK to `agents(id)`, but `'system'` doesn't exist in the agents table.
+
+**Fix:** `logModelUsage()` now sanitizes `agentId` — converts `'system'` to `null` before insert.
+
+**Files:** `src/lib/models.js`
+
+---
+
+## ISS-019: Linear custom field calls pollute logs with errors
+
+**Date:** Feb 24, 2026 | **Severity:** Low | **Status:** Fixed (v0.9.4)
+
+**Symptom:** Worker logs filled with `[linear] Unknown custom field: Started At`, `Completed At`, `Self-Critique Score` on every step execution.
+
+**Root Cause:** `ensureCustomFieldsExist()` is a stub — initializes empty cache. Every `updateIssueCustomField()` call fails with "Unknown custom field" because the cache has no field IDs. Custom fields were never created in Linear.
+
+**Fix:** Changed `console.error` to silent return. Known-unimplemented feature — no need for error logs on every invocation.
+
+**Files:** `src/lib/linear.js`
+
+---
+
+## ISS-018: Linear project description exceeds 255 character limit
+
+**Date:** Feb 24, 2026 | **Severity:** Medium | **Status:** Fixed (v0.9.4)
+
+**Symptom:** `syncDecomposedProjectToLinear()` fails with "description must be shorter than or equal to 255 characters" from Linear API.
+
+**Root Cause:** Description string concatenates LLM-polished description (~200 chars) + metadata suffix (end state, task count, parallel groups). Combined length regularly exceeds 255 chars. No truncation applied before API call.
+
+**Fix:** Added `truncateForLinear()` helper — caps at 255 chars with `...` suffix. Applied to both `syncMissionToLinear()` and `syncDecomposedProjectToLinear()`.
+
+**Files:** `src/lib/linear.js`
+
+---
+
+## ISS-017: Message classification built but never wired into message handler
+
+**Date:** Feb 24, 2026 | **Severity:** Critical | **Status:** Fixed (v0.9.4)
+
+**Symptom:** `classifyMessage()` (built in v0.9.0) never called. All Discord messages went directly to `handleFrasierMessage()`, bypassing the T1 classifier. Full projects could be misrouted as simple proposals if Frasier generated `[ACTION:PROPOSAL]` instead of `[ACTION:NEW_PROJECT]`.
+
+**Root Cause:** `classifyMessage()` was implemented at lines 132-192 of discord_bot.js but the message handler at line 102 called `handleFrasierMessage()` directly without invoking it. The function was orphaned — built but never connected.
+
+**Fix:** Three changes: (1) Message handler now calls `classifyMessage()` before `handleFrasierMessage()`. (2) New `resolveActionTag()` function overrides Frasier's ACTION tag when T1 says `full_project` with confidence ≥ 0.7. (3) Classification hint injected into Frasier's prompt for full_project messages.
+
+**Decision:** D-038
+
+**Files:** `src/discord_bot.js`
+
+---
+
 ## ISS-016: Completion notification pipeline broken — race condition + missing events
 
 **Date:** Feb 24, 2026 | **Severity:** Critical | **Status:** Fixed (v0.9.3)

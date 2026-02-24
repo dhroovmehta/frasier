@@ -4,6 +4,35 @@ All architectural and design decisions, with context and trade-offs.
 
 ---
 
+## D-038: Wire Classification Into Message Handler with Override Logic
+
+**Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** `classifyMessage()` (v0.9.0) was built and tested but never called from the message handler. All messages went directly to `handleFrasierMessage()`, relying entirely on Frasier's `[ACTION:*]` tags for routing. During integration testing, this meant full projects could be misclassified as simple proposals.
+
+**Decision:** Wire `classifyMessage()` into the handler with a `resolveActionTag()` override:
+1. Call `classifyMessage()` BEFORE `handleFrasierMessage()` on every Discord message
+2. Pass classification to `handleFrasierMessage()` — inject hint into Frasier's prompt when T1 says `full_project`
+3. After Frasier responds, `resolveActionTag()` resolves disagreements:
+   - T1 says `full_project` (confidence ≥ 0.7) + Frasier says anything except `RESPONSE` → force `NEW_PROJECT`
+   - T1 says `full_project` but Frasier says `RESPONSE` → trust Frasier (don't force work on casual messages)
+   - All other cases → trust Frasier's tag
+
+**Alternatives Considered:**
+1. Replace Frasier's ACTION tags entirely with classifier → loses Frasier's conversational context and PROJECT_DETAILS extraction
+2. Only use classifier, skip Frasier call for casual messages → breaks the "always talk to Frasier" UX
+3. Add classifier as post-hoc validation only → still misses cases where Frasier wrong-tags on first pass
+
+**Trade-offs:**
+- (+) Full projects always get decomposed, regardless of Frasier's tag
+- (+) Classification is cheap (T1, ~100 tokens) — negligible cost
+- (+) Classification persisted for audit trail
+- (+) Backward compatible — `resolveActionTag` gracefully handles null classification
+- (-) Extra T1 LLM call per message (~$0.001 each, ~50 messages/day = $0.05/day)
+- (-) Slight latency increase (~500ms for classification before Frasier responds)
+
+---
+
 ## D-037: Fix Completion Notification Pipeline (Move Post-Completion to Source)
 
 **Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier

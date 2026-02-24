@@ -1,6 +1,27 @@
 # Frasier — Completed Features
 
-> Last updated: Feb 24, 2026 (v0.9.2)
+> Last updated: Feb 24, 2026 (v0.9.4)
+
+---
+
+## Integration Bug Fixes (v0.9.4)
+
+### Classification Wiring
+- **File:** `src/discord_bot.js` — `resolveActionTag()`
+- `classifyMessage()` now called on every Discord message before Frasier responds
+- `resolveActionTag()` overrides Frasier's ACTION tag when T1 classifier says `full_project` (confidence ≥ 0.7)
+- Classification hint injected into Frasier's prompt for full_project messages
+- Respects `[ACTION:RESPONSE]` — won't force work on casual messages
+
+### Linear Description Truncation
+- **File:** `src/lib/linear.js` — `truncateForLinear()`
+- Caps descriptions at 255 chars with `...` suffix
+- Applied to both `syncMissionToLinear()` and `syncDecomposedProjectToLinear()`
+
+### Agent ID Sanitization
+- **File:** `src/lib/models.js` — `logModelUsage()`
+- Sanitizes `agentId` to `null` for non-agent callers (e.g., `'system'`)
+- Prevents FK constraint violations on `model_usage` table
 
 ---
 

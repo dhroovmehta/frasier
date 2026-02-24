@@ -4,6 +4,31 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.9.4] — 2026-02-24 (Integration Bug Fixes)
+
+### Fixed
+- **ISS-017: Message classification never wired in** — `classifyMessage()` (built in v0.9.0) was never called from the message handler. All messages bypassed the T1 classifier and relied solely on Frasier's ACTION tags. Now wired into the handler with a `resolveActionTag()` override that forces `[ACTION:NEW_PROJECT]` when the T1 classifier says `full_project` with confidence ≥ 0.7.
+- **ISS-018: Linear project description > 255 chars** — `syncDecomposedProjectToLinear()` concatenated polished description + metadata, often exceeding Linear's 255-character limit. Added `truncateForLinear()` helper applied to both `syncMissionToLinear()` and `syncDecomposedProjectToLinear()`.
+- **ISS-019: Linear custom field log noise** — `updateIssueCustomField()` logged `console.error` for every call because custom fields were never created in Linear. Changed to silent return (known-unimplemented feature).
+- **ISS-020: model_usage FK violation on agentId='system'** — `polishTitleAndDescription()` called `callLLM` with `agentId: 'system'`, which doesn't exist in the `agents` table. `logModelUsage()` now sanitizes `agentId` to `null` for non-agent callers.
+
+### Added
+- **`resolveActionTag()` in `discord_bot.js`:** Pure function that resolves the effective action from Frasier's response + T1 classification. Overrides Frasier's tag when the classifier disagrees on `full_project` (confidence ≥ 0.7), but respects `[ACTION:RESPONSE]` to avoid forcing work on casual messages.
+- **`truncateForLinear()` in `linear.js`:** Caps strings at 255 chars with `...` suffix for Linear API compliance.
+- **Classification context injection:** When T1 says `full_project`, Frasier's prompt now includes a hint to use `[ACTION:NEW_PROJECT]`, reducing misclassification.
+- **TDD Tests:** 23 new tests in `tests/v09/bugfixes-v094.test.js` — 11 for resolveActionTag, 3 for classifyMessage export, 4 for truncation, 5 for agent ID sanitization.
+
+### Modified
+- **`src/discord_bot.js`:** Message handler now calls `classifyMessage()` before `handleFrasierMessage()`. Action tag parsing replaced with `resolveActionTag()`. Frasier instructions include classification hint for full_project.
+- **`src/lib/linear.js`:** Added `truncateForLinear()`. Applied to both sync functions. Custom field error log silenced.
+- **`src/lib/models.js`:** `logModelUsage()` sanitizes `agentId` — converts `'system'` to `null` before insert.
+
+### Notes
+- All 439 tests pass (416 existing + 23 new, zero regressions).
+- 31 test suites.
+
+---
+
 ## [0.9.3] — 2026-02-24 (Completion Notification Pipeline)
 
 ### Fixed

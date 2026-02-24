@@ -98,8 +98,14 @@ client.on(Events.MessageCreate, async (message) => {
       return;
     }
 
-    // Everything else becomes a mission proposal via Frasier
-    await handleFrasierMessage(message, content);
+    // Classify BEFORE Frasier responds — cheap T1 call determines routing.
+    // WHY: Frasier's ACTION tags are unreliable for distinguishing full_project
+    // from simple_task. The T1 classifier is faster, cheaper, and more consistent.
+    const classification = await classifyMessage(content, message.id);
+    console.log(`[discord] Classification: ${classification.classification} (confidence: ${classification.confidence})`);
+
+    // Frasier handles the conversation + routing with classification context
+    await handleFrasierMessage(message, content, classification);
   } catch (err) {
     console.error('[discord] Error handling message:', err.message);
     await message.reply('Something went wrong. Error logged.');
@@ -212,6 +218,47 @@ async function persistClassification(messageContent, discordMessageId, classific
 }
 
 // ============================================================
+// ACTION TAG RESOLUTION
+// ============================================================
+
+/**
+ * Resolve the effective action tag from Frasier's response + T1 classification.
+ * WHY: The T1 classifier is cheap and consistent at spotting full_project requests.
+ * When it says "full_project" with high confidence but Frasier says [ACTION:PROPOSAL],
+ * override to NEW_PROJECT so the decomposition engine always runs for real projects.
+ *
+ * @param {string} response - Frasier's LLM response text
+ * @param {Object|null} classification - from classifyMessage(), may be null
+ * @returns {string} 'NEW_PROJECT' | 'MULTI_STEP_PROPOSAL' | 'PROPOSAL' | 'APPROVAL_NEEDED' | 'RESPONSE'
+ */
+function resolveActionTag(response, classification) {
+  // Parse what Frasier actually said
+  let frasierAction = 'RESPONSE'; // default when no tag found
+  if (response.includes('[ACTION:NEW_PROJECT]')) frasierAction = 'NEW_PROJECT';
+  else if (response.includes('[ACTION:MULTI_STEP_PROPOSAL]')) frasierAction = 'MULTI_STEP_PROPOSAL';
+  else if (response.includes('[ACTION:PROPOSAL]')) frasierAction = 'PROPOSAL';
+  else if (response.includes('[ACTION:APPROVAL_NEEDED]')) frasierAction = 'APPROVAL_NEEDED';
+  else if (response.includes('[ACTION:RESPONSE]')) frasierAction = 'RESPONSE';
+
+  // No classification data — trust Frasier entirely
+  if (!classification || !classification.classification) return frasierAction;
+
+  // Override logic: T1 says full_project with high confidence → force NEW_PROJECT
+  // UNLESS Frasier said RESPONSE (a deliberate "no work" signal we should respect)
+  if (classification.classification === 'full_project' &&
+      typeof classification.confidence === 'number' &&
+      classification.confidence >= 0.7 &&
+      frasierAction !== 'RESPONSE') {
+    if (frasierAction !== 'NEW_PROJECT') {
+      console.log(`[discord] Classification override: T1 says full_project (${classification.confidence}) but Frasier said ${frasierAction}. Routing to NEW_PROJECT.`);
+    }
+    return 'NEW_PROJECT';
+  }
+
+  return frasierAction;
+}
+
+// ============================================================
 // MESSAGE HANDLING
 // ============================================================
 
@@ -219,7 +266,7 @@ async function persistClassification(messageContent, discordMessageId, classific
  * Handle messages as Frasier conversations.
  * Zero talks to Frasier → Frasier processes → creates proposal or responds.
  */
-async function handleFrasierMessage(message, content) {
+async function handleFrasierMessage(message, content, classification = null) {
   await message.channel.sendTyping();
 
   // Build Frasier's prompt with memory
@@ -295,7 +342,10 @@ The system will create a project with lifecycle tracking (discovery → requirem
 
 [ACTION:APPROVAL_NEEDED] — Use when something requires Zero's explicit approval before proceeding (e.g., spending over budget, major strategic decisions).
 
-DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL] for multi-phase requests, [ACTION:NEW_PROJECT] for major initiatives. It is far worse to miss a task (Zero waits forever for nothing) than to create an unnecessary proposal (which is harmless).`;
+DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL] for multi-phase requests, [ACTION:NEW_PROJECT] for major initiatives. It is far worse to miss a task (Zero waits forever for nothing) than to create an unnecessary proposal (which is harmless).` +
+    (classification && classification.classification === 'full_project' && classification.confidence >= 0.7
+      ? `\n\nIMPORTANT: Our pre-screening classifier identified this as a FULL PROJECT (confidence: ${classification.confidence.toFixed(2)}). Unless you strongly disagree, use [ACTION:NEW_PROJECT] with [PROJECT_DETAILS] to route this through the decomposition engine.`
+      : '');
 
   // Call LLM as Frasier — always Tier 1, Frasier is just routing/responding
   const result = await models.callLLM({
@@ -332,8 +382,10 @@ DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL]
     }
   }
 
-  // Parse the action tag
-  if (response.includes('[ACTION:NEW_PROJECT]')) {
+  // Resolve action using both Frasier's response and T1 classification
+  const action = resolveActionTag(response, classification);
+
+  if (action === 'NEW_PROJECT') {
     // NEW PROJECT: Create a project with lifecycle tracking, determine needed roles,
     // find/hire agents, and create the first mission.
     const cleanResponse = response.replace(/\[ACTION:\w+\]/g, '').replace(/\[PROJECT_DETAILS\][\s\S]*?\[\/PROJECT_DETAILS\]/g, '').trim();
@@ -438,7 +490,7 @@ DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL]
       });
     }
 
-  } else if (response.includes('[ACTION:MULTI_STEP_PROPOSAL]')) {
+  } else if (action === 'MULTI_STEP_PROPOSAL') {
     // Multi-phase mission — include the [PHASES] block in the proposal description
     // so heartbeat can parse it downstream and create chained steps
     const cleanResponse = response.replace(/\[ACTION:\w+\]/g, '').trim();
@@ -465,7 +517,7 @@ DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL]
       : '\n\n*Mission proposal created. Team will pick this up shortly.*';
     await sendSplit(message.channel, cleanResponse.replace(/\[PHASES\][\s\S]*?\[\/PHASES\]/g, '').trim() + suffix);
 
-  } else if (response.includes('[ACTION:PROPOSAL]')) {
+  } else if (action === 'PROPOSAL') {
     // Single-step mission proposal
     const cleanResponse = response.replace(/\[ACTION:\w+\]/g, '').trim();
     await missions.createProposal({
@@ -1599,7 +1651,7 @@ function detectFounderDirective(content) {
 // EXPORTS (for testing)
 // ============================================================
 
-module.exports = { classifyMessage };
+module.exports = { classifyMessage, resolveActionTag };
 
 // ============================================================
 // STARTUP

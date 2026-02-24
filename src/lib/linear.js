@@ -93,6 +93,19 @@ async function linearRequest(query, variables = {}) {
 }
 
 // ============================================================
+// HELPERS
+// ============================================================
+
+/**
+ * Truncate a string to fit Linear's 255 character limit for descriptions.
+ * WHY: Linear's API rejects project descriptions > 255 chars (ISS-017).
+ */
+function truncateForLinear(str, max = 255) {
+  if (!str || str.length <= max) return str || '';
+  return str.substring(0, max - 3) + '...';
+}
+
+// ============================================================
 // LLM TITLE POLISHING
 // ============================================================
 
@@ -171,7 +184,7 @@ async function syncMissionToLinear(mission) {
       {
         input: {
           name: polished.title,
-          description: polished.description,
+          description: truncateForLinear(polished.description),
           teamIds: teamId ? [teamId] : []
         }
       }
@@ -338,7 +351,8 @@ async function updateIssueCustomField(stepId, fieldName, value) {
 
     const fieldId = cache?.customFields?.[fieldName];
     if (!fieldId) {
-      console.error(`[linear] Unknown custom field: ${fieldName}`);
+      // WHY: Custom fields are not yet created in Linear (ISS-017).
+      // Silent skip instead of error log to avoid polluting worker output.
       return null;
     }
 
@@ -497,6 +511,11 @@ async function syncDecomposedProjectToLinear({ missionId, title, plan, steps }) 
     const polishedProject = await polishTitleAndDescription(title);
 
     const teamId = process.env.LINEAR_TEAM_ID;
+    // WHY: Linear's API rejects descriptions > 255 chars.
+    // Truncate with ellipsis after appending metadata.
+    const fullDescription = `${polishedProject.description}\n\nEnd state: ${plan.end_state || 'production_docs'}\nTasks: ${plan.tasks.length}\nParallel groups: ${[...new Set(plan.tasks.map(t => t.parallel_group))].length}`;
+    const linearDescription = truncateForLinear(fullDescription);
+
     const projectData = await linearRequest(
       `mutation ProjectCreate($input: ProjectCreateInput!) {
         projectCreate(input: $input) {
@@ -507,7 +526,7 @@ async function syncDecomposedProjectToLinear({ missionId, title, plan, steps }) 
       {
         input: {
           name: polishedProject.title,
-          description: `${polishedProject.description}\n\nEnd state: ${plan.end_state || 'production_docs'}\nTasks: ${plan.tasks.length}\nParallel groups: ${[...new Set(plan.tasks.map(t => t.parallel_group))].length}`,
+          description: linearDescription,
           teamIds: teamId ? [teamId] : []
         }
       }

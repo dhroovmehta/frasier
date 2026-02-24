@@ -409,10 +409,15 @@ async function logModelUsage({
   errorMessage = null,
   metadata = {}
 }) {
+  // WHY: model_usage.agent_id has a FK to agents(id). Internal calls use
+  // agentId='system' which doesn't exist in agents table → constraint violation.
+  // Sanitize to null for non-agent callers (ISS-017).
+  const sanitizedAgentId = (agentId && agentId !== 'system') ? agentId : null;
+
   const { error } = await supabase
     .from('model_usage')
     .insert({
-      agent_id: agentId,
+      agent_id: sanitizedAgentId,
       mission_step_id: missionStepId,
       model_name: modelName,
       model_tier: modelTier,
