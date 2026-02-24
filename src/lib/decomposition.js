@@ -148,7 +148,18 @@ async function decomposeProject({ projectId, missionId, directive, frasierAgentI
     await createStepsFromPlan(missionId, plan, agentMap);
 
     // 11. Sync to Linear (fire-and-forget — failure doesn't block execution)
-    linear.syncMissionToLinear(missionId).catch(() => {});
+    // WHY: syncMissionToLinear expects a mission object ({id, title, description}),
+    // not just the ID. Fetch the full row so Linear gets a proper project name.
+    const { data: missionObj } = await supabase
+      .from('missions')
+      .select('id, title, description')
+      .eq('id', missionId)
+      .single();
+    if (missionObj) {
+      linear.syncMissionToLinear(missionObj).catch(err =>
+        console.error(`[linear] Mission sync failed (non-blocking): ${err.message}`)
+      );
+    }
 
     // 12. Save approach memory for future decompositions
     await approachMemory.save({
