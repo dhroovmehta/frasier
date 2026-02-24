@@ -239,6 +239,94 @@ async function prefetchUrls(text) {
   return { enrichedText: text + lines.join('\n'), fetchedUrls: fetched.length };
 }
 
+// ============================================================
+// DISCORD ATTACHMENT FETCHING (text file downloads)
+// ============================================================
+
+// WHY: When Dhroov drops a .md roadmap (or .txt spec, .json config) into Discord,
+// the bot needs to read the file content into the pipeline alongside any typed message.
+// Discord's CDN serves raw files — no HTML stripping needed, just a simple HTTP GET.
+// Binary files (images, PDFs) are skipped.
+
+const TEXT_EXTENSIONS = ['.md', '.txt', '.json', '.csv', '.log', '.yaml', '.yml', '.xml', '.toml', '.ini'];
+const TEXT_CONTENT_TYPES = ['text/', 'application/json', 'application/xml', 'application/yaml'];
+const MAX_ATTACHMENT_SIZE = 100 * 1024;   // 100KB pre-download check
+const MAX_ATTACHMENT_CHARS = 50000;        // 50K chars post-download truncation
+const MAX_ATTACHMENTS = 3;
+
+/**
+ * Download text-based file attachments from a Discord message.
+ *
+ * @param {Collection} attachments - Discord.js message.attachments Collection
+ * @returns {{ content: string, attachmentCount: number }}
+ */
+async function fetchAttachments(attachments) {
+  if (!attachments || attachments.size === 0) {
+    return { content: '', attachmentCount: 0 };
+  }
+
+  const fetched = [];
+
+  for (const [, attachment] of [...attachments.entries()].slice(0, MAX_ATTACHMENTS)) {
+    const { name, size, url, contentType } = attachment;
+
+    // Extension-first filtering (primary) — Discord often sends application/octet-stream for text files
+    const ext = (name || '').toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || '';
+    const isTextByExt = TEXT_EXTENSIONS.includes(ext);
+    const isTextByType = contentType && TEXT_CONTENT_TYPES.some(prefix => contentType.startsWith(prefix));
+
+    if (!isTextByExt && !isTextByType) {
+      console.log(`[web] Skipping non-text attachment: ${name} (${contentType || 'unknown type'})`);
+      continue;
+    }
+
+    // Pre-download size check — reject before wasting bandwidth
+    if (size > MAX_ATTACHMENT_SIZE) {
+      console.log(`[web] Skipping oversized attachment: ${name} (${(size / 1024).toFixed(1)}KB > 100KB limit)`);
+      continue;
+    }
+
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': BROWSER_UA },
+        signal: AbortSignal.timeout(15000)  // 15s timeout for larger files
+      });
+
+      if (!response.ok) {
+        console.log(`[web] Failed to download attachment ${name}: HTTP ${response.status}`);
+        continue;
+      }
+
+      let text = await response.text();
+
+      // Post-download truncation
+      if (text.length > MAX_ATTACHMENT_CHARS) {
+        console.log(`[web] Truncating attachment ${name}: ${text.length} chars → ${MAX_ATTACHMENT_CHARS}`);
+        text = text.substring(0, MAX_ATTACHMENT_CHARS) + '\n\n[...truncated at 50,000 characters]';
+      }
+
+      fetched.push({ name, text });
+    } catch (err) {
+      console.error(`[web] Error downloading attachment ${name}: ${err.message}`);
+    }
+  }
+
+  if (fetched.length === 0) {
+    return { content: '', attachmentCount: 0 };
+  }
+
+  // Build formatted content block (mirrors prefetchUrls format)
+  const lines = ['# ATTACHED FILES (downloaded from Discord message)', ''];
+  for (const f of fetched) {
+    lines.push(`## File: ${f.name}`);
+    lines.push(f.text);
+    lines.push('');
+  }
+
+  console.log(`[web] Downloaded ${fetched.length} attachment(s): ${fetched.map(f => f.name).join(', ')}`);
+  return { content: lines.join('\n'), attachmentCount: fetched.length };
+}
+
 /**
  * Rewrite URLs that need special handling (Twitter/X → fxtwitter API, etc.)
  * WHY: x.com and twitter.com block non-authenticated scraping entirely.
@@ -628,6 +716,7 @@ module.exports = {
   fetchPage,
   searchWeb,
   prefetchUrls,
+  fetchAttachments,
   resolveWebTags,
   formatWebResults,
   htmlToText

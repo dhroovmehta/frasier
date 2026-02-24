@@ -4,6 +4,61 @@ All architectural and design decisions, with context and trade-offs.
 
 ---
 
+## D-040: Discord Attachment Processing — Extension-First Filtering
+
+**Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Dhroov wants to drop `.md` roadmap files into Discord and have Frasier process them as project directives. The bot only reads `message.content` (typed text) and ignores `message.attachments`. Attachment-only messages are silently dropped.
+
+**Decision:** Process text-based attachments in the message handler BEFORE the empty-content guard. Use a two-check filter: file extension allowlist (primary) OR contentType prefix match (secondary).
+
+Extension-first because Discord often sends `application/octet-stream` for `.md` and `.txt` files — relying on contentType alone would miss them.
+
+**Implementation:**
+- New `fetchAttachments()` function in `web.js` (follows existing `prefetchUrls()` enrichment pattern)
+- Message handler: `let content` + attachment fetch + combine BEFORE `if (!content) return`
+- Combined content flows through classify → Frasier → decompose pipeline unchanged
+
+**Alternatives Considered:**
+1. Process attachments inside `handleFrasierMessage()` — doesn't fix the empty-check blocker at line 90
+2. Use contentType only — Discord sends `application/octet-stream` for text files, too unreliable
+3. Add a file-parsing library (pdf-parse) — unnecessary for text files, adds dependency
+4. Store attachments in Supabase — over-engineering for the use case
+
+**Trade-offs:**
+- (+) Zero new dependencies
+- (+) Follows existing `prefetchUrls()` enrichment pattern — consistent architecture
+- (+) No downstream changes — classify, Frasier, decompose all receive a string
+- (-) Cannot process binary formats (PDF, DOCX, images). Acceptable — text is the 80% case, PDF can be added later.
+
+---
+
+## D-039: Broad AgentId Sanitization — Allowlist Over Blocklist
+
+**Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** ISS-020 (v0.9.4) fixed `agentId='system'` by converting it to `null` in `logModelUsage()`. But ISS-023 revealed `agentId='frasier'` from a different caller (`classifyMessage()` in discord_bot.js). The per-value blocklist approach was fundamentally flawed — any new internal caller passing a non-agent string would trigger the same FK violation.
+
+**Decision:** Replace per-value sanitization with an allowlist pattern:
+```javascript
+const sanitizedAgentId = (agentId && agentId.startsWith('agent-')) ? agentId : null;
+```
+Only agent IDs matching the `agent-*` naming convention (used by `autoHireGapAgent()` and all seed data) are kept. Everything else — `'system'`, `'frasier'`, `'frasier-cos'`, arbitrary strings from future callers — is sanitized to `null`.
+
+**Also fixed the caller:** `discord_bot.js` `classifyMessage()` now passes `agentId: null` instead of `'frasier'`, fixing the issue at the source.
+
+**Alternatives Considered:**
+1. Keep expanding the blocklist (`if (id === 'system' || id === 'frasier' || ...)`) — fragile, guaranteed to miss future callers
+2. Create rows in `agents` table for non-agent callers ('system', 'frasier') — pollutes agent data, confuses queries
+3. Remove FK constraint from `model_usage.agent_id` — loses data integrity
+
+**Trade-offs:**
+- (+) Future-proof — any new non-agent caller is automatically sanitized
+- (+) Simple — one line of code, no maintenance
+- (-) Agent IDs that don't follow the `agent-*` convention would be silently dropped. Acceptable because all agents are created via `autoHireGapAgent()` which enforces this convention.
+
+---
+
 ## D-038: Wire Classification Into Message Handler with Override Logic
 
 **Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier

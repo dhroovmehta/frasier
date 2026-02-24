@@ -169,6 +169,30 @@ function makeEscalation(overrides = {}) {
   };
 }
 
+function makeAttachment(overrides = {}) {
+  return {
+    id: overrides.id || `attach-${idCounter++}`,
+    name: overrides.name || 'document.md',
+    size: overrides.size || 1024,
+    url: overrides.url || `https://cdn.discordapp.com/attachments/123/456/${overrides.name || 'document.md'}`,
+    contentType: overrides.contentType || 'text/plain',
+    ...overrides
+  };
+}
+
+// WHY: Discord.js message.attachments is a Collection (Map-like) with a .size property.
+// Our tests need to simulate this without pulling in the full discord.js Collection class.
+function makeAttachmentCollection(attachments = []) {
+  const map = new Map(attachments.map(a => [a.id || `attach-${idCounter++}`, a]));
+  return {
+    size: map.size,
+    values: () => map.values(),
+    entries: () => map.entries(),
+    forEach: (fn) => map.forEach(fn),
+    get: (key) => map.get(key)
+  };
+}
+
 function resetIdCounter() {
   idCounter = 1;
 }
@@ -184,5 +208,7 @@ module.exports = {
   makeDependency,
   makeDecompositionPlan,
   makeEscalation,
+  makeAttachment,
+  makeAttachmentCollection,
   resetIdCounter
 };

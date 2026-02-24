@@ -4,6 +4,55 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.9.6] — 2026-02-24 (Discord Attachment Support)
+
+### Added
+- **Discord file attachment processing** — Bot now downloads text-based file attachments (.md, .txt, .json, .csv, .log, .yaml, .yml, .xml, .toml, .ini) from Discord messages and includes their content in the pipeline. Drop a roadmap into Discord and Frasier reads it.
+- **`fetchAttachments()` in `web.js`** — Filters by file extension (primary) or content type (secondary), enforces 100KB pre-download and 50K char post-download limits, caps at 3 attachments per message. Skips binary files.
+- **Attachment-only messages now work** — Previously, messages with no typed text were silently dropped. Now, text-based attachments are downloaded and used as the message body.
+- **TDD Tests:** 14 new tests in `tests/v09/attachments.test.js` — 11 unit tests for `fetchAttachments()`, 3 integration tests for message handler.
+
+### Fixed
+- **ISS-025: Attachment-only Discord messages silently dropped** — Line 89-90 of discord_bot.js checked `message.content` before processing attachments. Empty text = early return, even when files were attached.
+
+### Modified
+- **`src/discord_bot.js`:** Message handler now calls `web.fetchAttachments()` before the empty-content guard. Combined text+attachment content flows through classify → Frasier → decompose unchanged.
+- **`src/lib/web.js`:** Added `fetchAttachments()` function and exported it.
+- **`tests/helpers.js`:** Added `makeAttachment()` and `makeAttachmentCollection()` factory functions.
+
+### Notes
+- All 462 tests pass (448 existing + 14 new, zero regressions).
+- 33 test suites.
+- Decision: D-040. Issue: ISS-025.
+- Zero new dependencies.
+
+---
+
+## [0.9.5] — 2026-02-24 (MemoBot Integration Fixes)
+
+### Fixed
+- **ISS-021: Steps created with null fields — "mission #undefined" in logs** — `createStepsFromPlan()` in `decomposition.js` passed snake_case params (`mission_id`, `assigned_agent_id`, `model_tier`, `step_order`) to `createStep()`, which destructures camelCase (`missionId`, `assignedAgentId`, `modelTier`, `stepOrder`). JS destructuring silently returned `undefined` for all mismatched keys. Fixed by converting to camelCase.
+- **ISS-022: Linear cache `initialized=true` set before cache populated** — `ensureInitialized()` set `initialized=true` unconditionally after calling `ensureWorkflowStatesExist()` + `ensureLabelsExist()`. When those HTTP calls failed (Supabase 500, network error), the cache stayed empty but `initialized` was already `true`, so subsequent calls skipped init entirely. Now validates that `cache.workflowStates` has entries before setting the flag.
+- **ISS-023: model_usage FK violation on agentId='frasier'** — ISS-020 sanitized `agentId='system'` but missed `'frasier'` (passed from `classifyMessage()` in discord_bot.js). Broadened sanitization: `logModelUsage()` now rejects any agentId that doesn't start with `'agent-'`. Also fixed the caller in `discord_bot.js` to pass `null` instead of `'frasier'`.
+- **ISS-024: approach_memory FK violation on missionStepId=0** — `decomposeProject()` saved approach memory with `missionStepId: 0`. Step #0 doesn't exist in `mission_steps` → FK constraint violation. Changed to `null` (decomposition-level memory isn't tied to a specific step).
+
+### Added
+- **TDD Tests:** 9 new tests in `tests/v09/bugfixes-v095.test.js` — 3 for camelCase params (Bug 1), 2 for Linear cache validation (Bug 2), 3 for agentId sanitization (Bug 3), 1 for approach_memory FK (Bug 4).
+
+### Modified
+- **`src/lib/decomposition.js`:** `createStepsFromPlan()` passes camelCase params to `createStep()`. `decomposeProject()` saves approach memory with `missionStepId: null`.
+- **`src/lib/linear.js`:** `ensureInitialized()` validates cache has workflow states before setting `initialized=true`.
+- **`src/lib/models.js`:** `logModelUsage()` sanitizes agentId via `startsWith('agent-')` check (replaces per-value `'system'` blocklist from v0.9.4).
+- **`src/discord_bot.js`:** `classifyMessage()` passes `agentId: null` instead of `'frasier'`.
+- **`tests/v09/decomposition.test.js`:** Updated 2 pre-existing tests to use camelCase param names (`stepOrder`, `assignedAgentId`).
+
+### Notes
+- All 448 tests pass (439 existing + 9 new, zero regressions).
+- 32 test suites.
+- Decision: D-039.
+
+---
+
 ## [0.9.4] — 2026-02-24 (Integration Bug Fixes)
 
 ### Fixed

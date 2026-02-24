@@ -4,6 +4,86 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-025: Attachment-only Discord messages silently dropped
+
+**Date:** Feb 24, 2026 | **Severity:** Medium | **Status:** Fixed (v0.9.6)
+
+**Symptom:** When Dhroov sends a `.md` file attachment to Frasier with no typed text, the bot ignores it completely. No response, no log entry.
+
+**Root Cause:** Line 89-90 of `discord_bot.js`: `const content = message.content.trim(); if (!content) return;`. When a message has only file attachments and no typed text, `message.content` is an empty string, so the handler exits immediately. `message.attachments` was never checked or processed anywhere in the codebase.
+
+**Fix:** Added `web.fetchAttachments(message.attachments)` call before the empty-content guard. Text-based files (.md, .txt, .json, etc.) are downloaded from Discord's CDN and combined with any typed message. The empty check now runs against the combined content. Binary files (images, PDFs) are filtered out.
+
+**Files:** `src/discord_bot.js`, `src/lib/web.js`
+
+---
+
+## ISS-024: approach_memory FK violation — missionStepId=0 not in mission_steps
+
+**Date:** Feb 24, 2026 | **Severity:** Low | **Status:** Fixed (v0.9.5)
+
+**Symptom:** `approach_memory_mission_step_id_fkey` constraint failure during decomposition. Approach memory save rejected.
+
+**Root Cause:** `decomposeProject()` saved approach memory with `missionStepId: 0`. Decomposition-level memory isn't tied to a specific step, but `0` was used as a sentinel value. Step #0 doesn't exist in `mission_steps` — FK violation.
+
+**Fix:** Changed `missionStepId: 0` to `missionStepId: null`. Null is allowed by the FK constraint (nullable column).
+
+**Files:** `src/lib/decomposition.js`
+
+---
+
+## ISS-023: model_usage FK violation — agentId='frasier' not in agents table
+
+**Date:** Feb 24, 2026 | **Severity:** Low | **Status:** Fixed (v0.9.5)
+
+**Symptom:** `model_usage_agent_id_fkey` constraint failure during message classification. Same FK error as ISS-020 but different caller.
+
+**Root Cause:** ISS-020 fixed `agentId='system'` (from `polishTitleAndDescription`) but missed `agentId='frasier'` passed from `classifyMessage()` in `discord_bot.js`. The per-value sanitization approach was incomplete — any new non-agent caller would trigger the same bug.
+
+**Fix:** Two changes: (1) `logModelUsage()` now uses `startsWith('agent-')` check instead of per-value blocklist — only keeps IDs matching the `agent-*` naming convention. (2) `discord_bot.js` `classifyMessage()` passes `agentId: null` instead of `'frasier'`.
+
+**Decision:** D-039
+
+**Files:** `src/lib/models.js`, `src/discord_bot.js`
+
+---
+
+## ISS-022: Linear cache `initialized=true` set before cache populated
+
+**Date:** Feb 24, 2026 | **Severity:** Medium | **Status:** Fixed (v0.9.5)
+
+**Symptom:** `[linear] Unknown workflow state: In Progress` errors in worker logs despite `ensureInitialized()` (ISS-013, D-034) being called. Lazy init appeared to succeed but cache was still empty.
+
+**Root Cause:** `ensureInitialized()` set `initialized=true` unconditionally after calling `ensureWorkflowStatesExist()` + `ensureLabelsExist()`. When the underlying HTTP calls failed (Supabase Cloudflare 500, network timeout), the cache remained empty but the boolean flag was already `true`. All subsequent calls saw `if (initialized) return;` and skipped initialization — the cache was permanently broken until PM2 restart.
+
+**Fix:** `ensureInitialized()` now validates that `cache.workflowStates` has entries (`Object.keys().length > 0`) before setting `initialized=true`. If cache is empty after init attempt, logs an error and allows retry on next call.
+
+**Files:** `src/lib/linear.js`
+
+---
+
+## ISS-021: Steps created with null mission_id — "mission #undefined" in logs
+
+**Date:** Feb 24, 2026 | **Severity:** Critical | **Status:** Fixed (v0.9.5)
+
+**Symptom:** Steps #83-89 (MemoBot project) created with `mission_id: null` instead of `77`. Logs showed `[missions] Step #83 created for mission #undefined`. Steps were orphaned — not associated with any mission.
+
+**Root Cause:** `createStepsFromPlan()` in `decomposition.js` passed snake_case params to `createStep()`:
+```
+{ mission_id, assigned_agent_id, model_tier, step_order }
+```
+But `createStep()` destructures camelCase:
+```
+{ missionId, assignedAgentId, modelTier, stepOrder }
+```
+JavaScript destructuring silently sets mismatched keys to `undefined`. All 4 fields were `undefined`, making every step an orphan with no mission, no agent, no tier, and no order.
+
+**Fix:** Changed to camelCase params in `createStepsFromPlan()`: `{ missionId, description, assignedAgentId, modelTier, stepOrder }`.
+
+**Files:** `src/lib/decomposition.js`
+
+---
+
 ## ISS-020: model_usage FK violation — agentId='system' not in agents table
 
 **Date:** Feb 24, 2026 | **Severity:** Low | **Status:** Fixed (v0.9.4)

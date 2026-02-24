@@ -86,10 +86,23 @@ client.on(Events.MessageCreate, async (message) => {
   const zeroDiscordId = process.env.DISCORD_ZERO_ID;
   if (zeroDiscordId && message.author.id !== zeroDiscordId) return;
 
-  const content = message.content.trim();
+  let content = message.content.trim();
+
+  // Download text-based file attachments (roadmaps, specs, docs dropped into Discord)
+  // WHY: Attachment-only messages have empty content but still carry instructions.
+  // Fetch text files and combine with any typed message BEFORE the empty check.
+  const { content: attachmentContent, attachmentCount } = await web.fetchAttachments(message.attachments);
+  if (attachmentContent) {
+    content = content ? content + '\n\n' + attachmentContent : attachmentContent;
+  }
+
   if (!content) return;
 
-  console.log(`[discord] Message from Zero: "${content.substring(0, 80)}..."`);
+  if (attachmentCount > 0) {
+    console.log(`[discord] Message from Zero with ${attachmentCount} attachment(s): "${content.substring(0, 80)}..."`);
+  } else {
+    console.log(`[discord] Message from Zero: "${content.substring(0, 80)}..."`);
+  }
 
   try {
     // Handle special commands
