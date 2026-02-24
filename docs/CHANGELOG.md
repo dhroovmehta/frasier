@@ -4,6 +4,35 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.9.3] — 2026-02-24 (Completion Notification Pipeline)
+
+### Fixed
+- **ISS-016: Race condition in mission completion** — The worker completed missions before the heartbeat could detect them, causing event logging, project phase advancement, and Discord notifications to never fire. Moved all post-completion logic into `completeMission()` and `advanceProjectPhase()` so it triggers regardless of who calls it.
+- **5 gaps in notification pipeline:** (1) Race condition between worker and heartbeat, (2) `announceAlerts()` didn't listen for mission/project events, (3) Heartbeat's project phase chain was dead code, (4) `advanceProjectPhase()` logged no events, (5) No `project_completed` event existed.
+
+### Added
+- **`completeMission()` enriched:** Now logs `mission_completed` event, checks for project link, and triggers `checkPhaseCompletion()`. Idempotent — skips if already completed.
+- **`failMission()` enriched:** Now logs `mission_failed` event with reason.
+- **`advanceProjectPhase()` enriched:** Now logs `project_phase_advanced` or `project_completed` events.
+- **Discord notifications:** `announceAlerts()` now handles `project_phase_advanced` and `project_completed` events.
+- **TDD Tests:** 10 new tests — 6 in `completion-pipeline.test.js` + 4 in `phase-advancement.test.js`.
+
+### Modified
+- **`src/lib/missions.js`:** Added `events` and `projects` imports. `completeMission()` and `failMission()` now log events and trigger project phase checks.
+- **`src/lib/projects.js`:** Added `events` import. `advanceProjectPhase()` now logs phase transition events.
+- **`src/discord_bot.js`:** `announceAlerts()` handles `project_phase_advanced` and `project_completed` events.
+- **`src/heartbeat.js`:** `checkMissions()` simplified to safety-net only — event logging and phase checks moved to source functions. `checkStalledProjects()` handles next-phase mission creation.
+
+### Data Flow Change
+**Before (v0.9.2):** Worker completes mission → nobody notified, project stuck in current phase.
+**After (v0.9.3):** Worker completes mission → event logged → project phase checked → Discord notified → `checkStalledProjects()` creates next-phase mission.
+
+### Notes
+- All 416 tests pass (406 existing + 10 new, zero regressions).
+- 30-second delay between phase advancement and next-phase mission creation (via `checkStalledProjects()` on next heartbeat tick) — acceptable trade-off for architectural simplicity.
+
+---
+
 ## [0.9.2] — 2026-02-24 (Decomposition Wiring)
 
 ### Added

@@ -5,6 +5,8 @@
 
 const supabase = require('./supabase');
 const linear = require('./linear');
+const events = require('./events');
+const projects = require('./projects');
 
 // Agent expertise map for keyword-based routing
 const EXPERTISE_MAP = {
@@ -220,6 +222,17 @@ async function getActiveMissions(teamId = null) {
  * Complete a mission.
  */
 async function completeMission(missionId) {
+  // Idempotency: check current status before updating.
+  // WHY: Both worker and heartbeat can trigger this via checkMissionCompletion().
+  // Without this guard, we'd log duplicate events and double-trigger phase advancement.
+  const { data: current } = await supabase
+    .from('missions')
+    .select('status, title, team_id')
+    .eq('id', missionId)
+    .single();
+
+  if (!current || current.status === 'completed') return current;
+
   const { data, error } = await supabase
     .from('missions')
     .update({
@@ -238,10 +251,36 @@ async function completeMission(missionId) {
 
   console.log(`[missions] Mission #${missionId} completed`);
 
+  // Log event for Discord announcements (picked up by announceAlerts)
+  await events.logEvent({
+    eventType: 'mission_completed',
+    teamId: current.team_id,
+    severity: 'info',
+    description: `Mission #${missionId}: "${current.title}" completed`,
+    data: { missionId }
+  });
+
   // Sync to Linear (fire-and-forget)
   linear.completeProject(missionId).catch(err =>
     console.error(`[linear] Mission complete sync failed (non-blocking): ${err.message}`)
   );
+
+  // Check if this mission is linked to a project — if so, advance the project phase.
+  // WHY: Previously this lived in heartbeat.checkMissions() but the race condition
+  // meant it never fired (worker completed first, heartbeat skipped already-done missions).
+  try {
+    const { data: projectLink } = await supabase
+      .from('project_missions')
+      .select('project_id')
+      .eq('mission_id', missionId)
+      .maybeSingle();
+
+    if (projectLink) {
+      await projects.checkPhaseCompletion(projectLink.project_id);
+    }
+  } catch (err) {
+    console.error(`[missions] Project phase check failed for mission #${missionId}: ${err.message}`);
+  }
 
   return data;
 }
@@ -250,6 +289,13 @@ async function completeMission(missionId) {
  * Fail a mission.
  */
 async function failMission(missionId, reason = null) {
+  // Fetch mission data for event logging
+  const { data: current } = await supabase
+    .from('missions')
+    .select('title, team_id')
+    .eq('id', missionId)
+    .single();
+
   const { data, error } = await supabase
     .from('missions')
     .update({
@@ -265,6 +311,15 @@ async function failMission(missionId, reason = null) {
     console.error(`[missions] Failed to mark mission #${missionId} as failed:`, error.message);
     return null;
   }
+
+  // Log event for Discord announcements
+  await events.logEvent({
+    eventType: 'mission_failed',
+    teamId: current?.team_id,
+    severity: 'warning',
+    description: `Mission #${missionId}: "${current?.title || 'Unknown'}" failed — ${reason || 'Unknown reason'}`,
+    data: { missionId, reason }
+  });
 
   // Sync to Linear (fire-and-forget)
   linear.cancelProject(missionId).catch(err =>

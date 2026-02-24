@@ -787,51 +787,15 @@ ${priorOutput ? `PRIOR PHASE OUTPUT (summary):\n${priorOutput}` : ''}`;
 // ============================================================
 
 async function checkMissions() {
+  // Safety net: catch any missions the worker might have missed.
+  // WHY: Event logging, project phase advancement, and Linear sync are now handled
+  // directly inside completeMission()/failMission() (ISS-016 fix). This eliminates
+  // the race condition where the worker completed first and heartbeat never saw it.
+  // checkStalledProjects() handles creating next-phase missions on the next tick.
   const activeMissions = await missions.getActiveMissions();
 
   for (const mission of activeMissions) {
-    const completed = await missions.checkMissionCompletion(mission.id);
-    if (completed) {
-      await events.logEvent({
-        eventType: 'mission_completed',
-        teamId: mission.team_id,
-        severity: 'info',
-        description: `Mission #${mission.id}: "${mission.title}" completed`,
-        data: { missionId: mission.id }
-      });
-
-      // PROJECT PHASE CHECK: If this mission is linked to a project,
-      // check if all missions in the current phase are now complete.
-      // If so, auto-advance the project to the next lifecycle phase.
-      try {
-        const { data: projectLink } = await require('./lib/supabase')
-          .from('project_missions')
-          .select('project_id')
-          .eq('mission_id', mission.id)
-          .maybeSingle();
-
-        if (projectLink) {
-          const advanced = await projects.checkPhaseCompletion(projectLink.project_id);
-          if (advanced) {
-            const project = await projects.getProject(projectLink.project_id);
-            console.log(`[heartbeat] Project #${projectLink.project_id} advanced to phase: ${project.phase}`);
-            await events.logEvent({
-              eventType: 'project_phase_advanced',
-              severity: 'info',
-              description: `Project "${project.name}" advanced to ${project.phase} phase`,
-              data: { projectId: project.id, phase: project.phase }
-            });
-
-            // AUTO-PROGRESS: Create next phase mission if project isn't completed
-            if (project.phase !== 'completed') {
-              await createNextPhaseMission(project, mission);
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`[heartbeat] Project phase check failed:`, err.message);
-      }
-    }
+    await missions.checkMissionCompletion(mission.id);
   }
 }
 

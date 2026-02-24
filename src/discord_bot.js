@@ -1377,6 +1377,28 @@ async function announceAlerts() {
     );
     await events.markProcessed([evt.id]);
   }
+
+  // Post project phase advancement notifications
+  // WHY: Dhroov needs to know when projects move through lifecycle phases.
+  const phaseEvents = await events.getUnprocessedEvents('project_phase_advanced');
+  for (const evt of phaseEvents) {
+    const ch = updatesChannel || alertChannel;
+    if (!ch) continue;
+    await sendSplit(ch,
+      `**Project Phase Advanced** — ${evt.description}`
+    );
+    await events.markProcessed([evt.id]);
+  }
+
+  // Post project completion notifications
+  // WHY: This is the big one — "Your project is done." Never existed before ISS-016.
+  const projectCompletedEvents = await events.getUnprocessedEvents('project_completed');
+  for (const evt of projectCompletedEvents) {
+    await sendSplit(alertChannel,
+      `**Project Delivered!** — ${evt.description}`
+    );
+    await events.markProcessed([evt.id]);
+  }
 }
 
 // ============================================================

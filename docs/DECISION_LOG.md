@@ -4,6 +4,33 @@ All architectural and design decisions, with context and trade-offs.
 
 ---
 
+## D-037: Fix Completion Notification Pipeline (Move Post-Completion to Source)
+
+**Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Worker completes missions before heartbeat detects them (race condition). Events, phase advancement, and Discord notifications never fire. 5 gaps in the pipeline.
+
+**Decision:** Move post-completion logic from heartbeat into source functions:
+- `completeMission()` → logs `mission_completed` event, checks project link, triggers `checkPhaseCompletion()`
+- `failMission()` → logs `mission_failed` event
+- `advanceProjectPhase()` → logs `project_phase_advanced` or `project_completed` events
+- Heartbeat's `checkMissions()` simplified to safety net (just calls `checkMissionCompletion()`)
+- `checkStalledProjects()` handles next-phase mission creation (30s delay, acceptable)
+
+**Alternatives Considered:**
+1. Fix heartbeat to detect already-completed missions → fragile, still relies on polling timing
+2. Add event queue/callback from worker → over-engineered for our polling architecture
+3. Move everything to worker.js → duplicates heartbeat logic, violates single responsibility
+
+**Trade-offs:**
+- (+) Events fire immediately when mission completes, regardless of caller
+- (+) Idempotent — safe for both worker and heartbeat to trigger
+- (+) Simpler heartbeat code (47 → 7 lines)
+- (-) 30s delay for next-phase mission creation (via checkStalledProjects instead of inline)
+- (-) missions.js now imports events + projects (2 new dependencies, but no circular)
+
+---
+
 ## D-036: Wire Decomposition Into Runtime (Direct Mission, No Proposal)
 
 **Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier

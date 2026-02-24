@@ -5,6 +5,7 @@
 // Lifecycle: discovery → requirements → design → build → test → deploy → completed
 
 const supabase = require('./supabase');
+const events = require('./events');
 
 // Phase sequence — ordered, cannot skip or reverse
 const PHASES = ['discovery', 'requirements', 'design', 'build', 'test', 'deploy'];
@@ -130,6 +131,15 @@ async function advanceProjectPhase(projectId) {
       .single();
 
     console.log(`[projects] Project #${projectId} completed!`);
+
+    // Log project_completed event for Discord announcements
+    await events.logEvent({
+      eventType: 'project_completed',
+      severity: 'info',
+      description: `Project "${project.name}" completed — all phases delivered`,
+      data: { projectId, projectName: project.name }
+    });
+
     return data;
   }
 
@@ -148,6 +158,15 @@ async function advanceProjectPhase(projectId) {
     .single();
 
   console.log(`[projects] Project #${projectId} advanced: ${project.phase} → ${nextPhase}`);
+
+  // Log phase advancement event for Discord announcements
+  await events.logEvent({
+    eventType: 'project_phase_advanced',
+    severity: 'info',
+    description: `Project "${project.name}" advanced from ${project.phase} to ${nextPhase}`,
+    data: { projectId, fromPhase: project.phase, toPhase: nextPhase }
+  });
+
   return data;
 }
 

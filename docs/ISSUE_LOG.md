@@ -4,6 +4,25 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-016: Completion notification pipeline broken — race condition + missing events
+
+**Date:** Feb 24, 2026 | **Severity:** Critical | **Status:** Fixed (v0.9.3)
+
+**Symptoms:** Projects marked completed in Supabase but Dhroov never notified via Discord. Linear tickets stuck in Backlog despite missions being done.
+
+**Root Cause:** 5 interconnected gaps:
+1. **Race condition:** Worker calls `checkMissionCompletion()` → `completeMission()` sets mission to `completed`. Heartbeat's `checkMissions()` queries `getActiveMissions()` (filters for `in_progress`), so it never sees the completed mission — event logging, project phase advancement, and next-mission creation all skip.
+2. **announceAlerts() deaf to completion events:** Only listened for `worker_error`, `tier3_escalation_needed`, `revision_cap_reached`, `agent_upskilled`. The `mission_completed` and `project_phase_advanced` events logged by heartbeat were never consumed.
+3. **Dead code in heartbeat:** Gap #1 made the entire post-completion chain (event logging, project phase check, next-mission creation) unreachable for worker-completed missions.
+4. **advanceProjectPhase() silent:** Logged to console but created no events — even if phase advancement worked, Discord couldn't announce it.
+5. **No project_completed event:** The concept didn't exist in the codebase.
+
+**Fix:** Moved post-completion logic INTO source functions: `completeMission()` logs events + checks project phases, `advanceProjectPhase()` logs phase/completion events, `announceAlerts()` handles new event types. Heartbeat simplified to safety net.
+
+**Decision:** D-037
+
+---
+
 ## ISS-015: Decomposition engine never called from runtime (built but not wired)
 
 **Date:** Feb 24, 2026 | **Severity:** High | **Status:** Fixed (v0.9.2)
