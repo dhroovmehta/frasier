@@ -261,6 +261,10 @@ async function setAgentStatus(agentId, status) {
  * Get a team by ID.
  */
 async function getTeam(teamId) {
+  // WHY: Prevents noisy Supabase queries and "Cannot coerce" errors when
+  // agents without a team assignment are matched (e.g. Frasier, test agents)
+  if (!teamId) return null;
+
   const { data, error } = await supabase
     .from('teams')
     .select('*')
@@ -884,6 +888,10 @@ async function findBestAgentAcrossTeams(roleCategory) {
   const keywords = SMART_ROLE_KEYWORDS[roleCategory] || [];
 
   for (const agent of allAgents) {
+    // WHY: Agents without a team (Frasier, test agents) can't receive missions
+    // — they have no team to route through, causing infinite heartbeat loops
+    if (!agent.team_id) continue;
+
     const agentRole = (agent.role || '').toLowerCase();
     if (keywords.some(kw => agentRole.includes(kw))) {
       return agent;

@@ -60,6 +60,56 @@ describe('findBestAgentAcrossTeams()', () => {
     expect(match).toBeTruthy();
     expect(match.display_name).toBe('Misato');
   });
+
+  test('skips agents without a team_id (e.g. test agents with null team)', async () => {
+    mockSupabase.__setData('agents', [
+      { id: 'test-agent', display_name: 'Rei', role: 'Memory System Tester', status: 'active', team_id: null, agent_type: 'sub_agent' },
+      { id: 'agent-gendo-1', display_name: 'Gendo', role: 'Research Analyst', status: 'active', team_id: 'team-research', agent_type: 'sub_agent' }
+    ]);
+
+    // "qa" keywords include "tester" — Rei matches but has no team_id so should be skipped
+    const match = await agents.findBestAgentAcrossTeams('qa');
+    // Should skip Rei (no team_id) and return null since Gendo doesn't match qa
+    expect(match).toBeNull();
+  });
+
+  test('returns team-assigned agent even when null-team agent matches first', async () => {
+    mockSupabase.__setData('agents', [
+      { id: 'test-agent', display_name: 'Rei', role: 'Research Analyst', status: 'active', team_id: null, agent_type: 'sub_agent' },
+      { id: 'agent-gendo-1', display_name: 'Gendo', role: 'Research Analyst', status: 'active', team_id: 'team-research', agent_type: 'sub_agent' }
+    ]);
+
+    const match = await agents.findBestAgentAcrossTeams('research');
+    expect(match).toBeTruthy();
+    expect(match.id).toBe('agent-gendo-1');
+    expect(match.team_id).toBe('team-research');
+  });
+});
+
+// ============================================================
+// getTeam() NULL GUARD
+// ============================================================
+
+describe('getTeam()', () => {
+  test('returns null immediately for null teamId without querying Supabase', async () => {
+    const result = await agents.getTeam(null);
+    expect(result).toBeNull();
+  });
+
+  test('returns null immediately for undefined teamId', async () => {
+    const result = await agents.getTeam(undefined);
+    expect(result).toBeNull();
+  });
+
+  test('returns team data for valid teamId', async () => {
+    mockSupabase.__setData('teams', [
+      { id: 'team-research', name: 'Team Research', status: 'active' }
+    ]);
+
+    const result = await agents.getTeam('team-research');
+    expect(result).toBeTruthy();
+    expect(result.id).toBe('team-research');
+  });
 });
 
 // ============================================================

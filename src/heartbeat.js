@@ -199,7 +199,8 @@ async function processProposals() {
       // Check team is active
       const team = await agents.getTeam(teamId);
       if (!team || team.status !== 'active') {
-        console.log(`[heartbeat] Team ${teamId} not active. Proposal #${proposal.id} deferred.`);
+        console.log(`[heartbeat] Team ${teamId} not active/found. Deferring proposal #${proposal.id}.`);
+        await deferProposal(proposal.id);
         continue;
       }
 
