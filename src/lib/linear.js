@@ -199,8 +199,8 @@ async function syncStepToLinear(step) {
     // Build label IDs
     const labelIds = [];
     if (cache?.labels) {
-      // Agent label
-      const agentName = (step.assigned_agent_id || '').split('-')[0];
+      // Agent label — agent IDs are "agent-{name}-{timestamp}", extract the name
+      const agentName = (step.assigned_agent_id || '').split('-')[1] || '';
       const capitalizedAgent = agentName.charAt(0).toUpperCase() + agentName.slice(1);
       if (cache.labels[capitalizedAgent]) {
         labelIds.push(cache.labels[capitalizedAgent]);
