@@ -40,6 +40,12 @@ const WORK_TYPE_MAP = {
 // Module-level cache for IDs resolved at startup
 let cache = null;
 
+// WHY: Worker process is a separate PM2 process from heartbeat. Heartbeat calls
+// initialize() on startup, but worker never does. Every updateIssueStatus() from
+// worker failed with "Unknown workflow state" because cache was empty.
+// ensureInitialized() lazily populates the cache on first use from any process.
+let initialized = false;
+
 // Timestamp of last poll — ensures no issues are missed between ticks
 let lastPollTime = null;
 
@@ -184,6 +190,7 @@ async function syncMissionToLinear(mission) {
  */
 async function syncStepToLinear(step) {
   if (!process.env.LINEAR_API_KEY) return null;
+  await ensureInitialized();
 
   try {
     // Look up parent project from linear_sync
@@ -272,6 +279,7 @@ async function syncStepToLinear(step) {
  */
 async function updateIssueStatus(stepId, stateName) {
   if (!process.env.LINEAR_API_KEY) return null;
+  await ensureInitialized();
 
   try {
     const issueId = await getLinearIssueId(stepId);
@@ -306,6 +314,7 @@ async function updateIssueStatus(stepId, stateName) {
  */
 async function updateIssueCustomField(stepId, fieldName, value) {
   if (!process.env.LINEAR_API_KEY) return null;
+  await ensureInitialized();
 
   try {
     const issueId = await getLinearIssueId(stepId);
@@ -351,6 +360,7 @@ async function updateIssueCustomField(stepId, fieldName, value) {
  */
 async function addIssueComment(stepId, commentBody) {
   if (!process.env.LINEAR_API_KEY) return null;
+  await ensureInitialized();
 
   try {
     const issueId = await getLinearIssueId(stepId);
@@ -464,6 +474,7 @@ async function syncCritiqueScore(stepId) {
  */
 async function syncDecomposedProjectToLinear({ missionId, title, plan, steps }) {
   if (!process.env.LINEAR_API_KEY) return null;
+  await ensureInitialized();
 
   try {
     // 1. Create Linear project
@@ -570,9 +581,89 @@ async function syncDecomposedProjectToLinear({ missionId, title, plan, steps }) 
       }
     }
 
+    // 3. Create dependency relations between Linear issues (fire-and-forget)
+    createDependencyRelations(missionId).catch(err =>
+      console.error(`[linear] Dependency relations failed (non-blocking): ${err.message}`)
+    );
+
     return project;
   } catch (err) {
     console.error(`[linear] syncDecomposedProjectToLinear failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Create blocking/blocked-by relations in Linear for DAG dependencies.
+ * WHY: Decomposed projects have step_dependencies but the Linear issues
+ * aren't linked. This makes the dependency graph visible in Linear's board.
+ * Called at end of syncDecomposedProjectToLinear().
+ *
+ * @param {number} missionId - The mission whose steps to link
+ * @returns {{ created: number } | null}
+ */
+async function createDependencyRelations(missionId) {
+  if (!process.env.LINEAR_API_KEY) return null;
+
+  try {
+    // Get all steps for this mission
+    const { data: steps } = await supabase
+      .from('mission_steps')
+      .select('id')
+      .eq('mission_id', missionId);
+
+    if (!steps || steps.length === 0) return null;
+
+    const stepIds = steps.map(s => s.id);
+
+    // Get all DAG dependencies between these steps
+    const { data: deps } = await supabase
+      .from('step_dependencies')
+      .select('step_id, depends_on_step_id')
+      .in('step_id', stepIds);
+
+    if (!deps || deps.length === 0) return { created: 0 };
+
+    let created = 0;
+    for (const dep of deps) {
+      // Look up Linear issue IDs from linear_sync
+      const { data: blockerSync } = await supabase
+        .from('linear_sync')
+        .select('entity_id')
+        .eq('mission_step_id', dep.depends_on_step_id)
+        .eq('entity_type', 'issue')
+        .maybeSingle();
+
+      const { data: blockedSync } = await supabase
+        .from('linear_sync')
+        .select('entity_id')
+        .eq('mission_step_id', dep.step_id)
+        .eq('entity_type', 'issue')
+        .maybeSingle();
+
+      // Skip if either side missing — sync record may not exist yet
+      if (!blockerSync?.entity_id || !blockedSync?.entity_id) continue;
+
+      const result = await linearRequest(
+        `mutation IssueRelationCreate($input: IssueRelationCreateInput!) {
+          issueRelationCreate(input: $input) { success }
+        }`,
+        {
+          input: {
+            issueId: blockedSync.entity_id,
+            relatedIssueId: blockerSync.entity_id,
+            type: 'blocks'
+          }
+        }
+      );
+
+      if (result?.issueRelationCreate?.success) created++;
+    }
+
+    console.log(`[linear] Created ${created} dependency relations for mission #${missionId}`);
+    return { created };
+  } catch (err) {
+    console.error(`[linear] createDependencyRelations failed: ${err.message}`);
     return null;
   }
 }
@@ -890,6 +981,23 @@ async function ensureWorkflowStatesExist() {
 }
 
 /**
+ * Lazily initialize the Linear cache on first use.
+ * WHY: Worker.js is a separate PM2 process that never calls initialize().
+ * This ensures any function that reads from cache triggers initialization
+ * automatically, regardless of which process it's running in.
+ */
+async function ensureInitialized() {
+  if (initialized) return;
+  if (!process.env.LINEAR_API_KEY) return;
+
+  console.log('[linear] Auto-initializing (lazy init from worker/other process)...');
+  await ensureWorkflowStatesExist();
+  await ensureLabelsExist();
+  initialized = true;
+  console.log('[linear] Lazy init complete');
+}
+
+/**
  * Initialize Linear integration: labels, workflow states, custom fields.
  * Called once on heartbeat startup.
  */
@@ -905,6 +1013,7 @@ async function initialize() {
   await ensureWorkflowStatesExist();
   await ensureCustomFieldsExist();
 
+  initialized = true;
   console.log('[linear] Initialization complete');
   return true;
 }
@@ -980,11 +1089,20 @@ function getCachedLabelId(name) {
 
 function __resetCache() {
   cache = null;
+  initialized = false;
+}
+
+function __resetInitialized() {
+  initialized = false;
 }
 
 function __setCache(newCache) {
   if (!cache) cache = {};
   Object.assign(cache, newCache);
+  // WHY: If cache is manually populated (by tests or initialize()), no lazy init needed.
+  // Without this, ensureInitialized() would trigger even when cache has valid data,
+  // consuming mock fetch responses intended for the actual test.
+  initialized = true;
 }
 
 function __resetPollTime() {
@@ -1007,9 +1125,11 @@ module.exports = {
   cancelProject,
   syncCritiqueScore,
   syncDecomposedProjectToLinear,
+  createDependencyRelations,
   ensureLabelsExist,
   ensureCustomFieldsExist,
   ensureWorkflowStatesExist,
+  ensureInitialized,
   initialize,
   validateWebhookSignature,
   processLinearWebhook,
@@ -1018,5 +1138,6 @@ module.exports = {
   getCachedLabelId,
   __resetCache,
   __setCache,
-  __resetPollTime
+  __resetPollTime,
+  __resetInitialized
 };

@@ -20,6 +20,7 @@ const agents = require('./lib/agents');
 const context = require('./lib/context');
 const pipeline = require('./lib/pipeline');
 const approachMemory = require('./lib/approach_memory');
+const linear = require('./lib/linear');
 const supabase = require('./lib/supabase');
 
 const POLL_INTERVAL_MS = 10 * 1000; // 10 seconds
@@ -304,39 +305,67 @@ async function processNextReview() {
     }
 
     if (isRejected) {
-      // Rejected — send back for revision
+      // 3-STRIKE REVISION CAP: Count past rejections before recording this one.
+      // WHY: Without a cap, QA can reject indefinitely (e.g., mission #75 looped 3+ times).
+      // After 3 total rejections, fail the step and escalate to the founder.
+      const pastRejections = await missions.countStepRejections(step.id);
+      const totalRejections = pastRejections + 1; // including this rejection
+
+      // Post rejection feedback as a comment on the Linear ticket
+      // WHY: Dhroov wants each rejection visible in Linear, not just Discord
+      const rejectionComment = `**Rejection #${totalRejections}** (${approval.review_type})\n\n${result.content.substring(0, 1500)}`;
+      linear.addIssueComment(step.id, rejectionComment).catch(err =>
+        console.error(`[linear] Rejection comment failed (non-blocking): ${err.message}`)
+      );
+
+      // Record the review (always — for audit trail)
       await missions.submitReview(approval.id, {
         status: 'rejected',
         feedback: result.content
       });
 
-      // Save rejection to reviewer's memory
-      await memory.saveMemory({
-        agentId: approval.reviewer_agent_id,
-        memoryType: 'decision',
-        content: `Rejected deliverable for step #${step.id}: ${result.content.substring(0, 300)}`,
-        summary: `Rejected step #${step.id} — sent back for revision`,
-        topicTags: ['qa-review', 'rejection'],
-        importance: 6,
-        sourceType: 'review'
-      });
+      if (totalRejections >= 3) {
+        // CAP REACHED: submitReview already sent back for revision (via sendBackForRevision),
+        // so we override by immediately failing the step. One extra DB write, but correct.
+        await missions.failStep(step.id, `Revision cap reached (${totalRejections} rejections). Escalating to founder.`);
 
-      // LESSON FROM REJECTION: The original agent learns from the feedback.
-      // WHY: Rejection feedback is the highest-value learning signal. An agent
-      // who remembers "my research lacked competitor analysis" won't repeat that mistake.
-      await generateLessonFromRejection(
-        step.assigned_agent_id,
-        step.description,
-        result.content
-      );
+        await events.logEvent({
+          eventType: 'revision_cap_reached',
+          agentId: step.assigned_agent_id,
+          severity: 'warning',
+          description: `Step #${step.id} failed after ${totalRejections} rejections. Task: "${step.description.substring(0, 100)}"`,
+          data: { stepId: step.id, missionId: step.mission_id, rejectionCount: totalRejections }
+        });
 
-      // PERSONA UPSKILLING: If an agent fails 5+ times on the same step, their persona
-      // is permanently upgraded with new expertise. This is the most effective growth
-      // mechanism because the persona is ALWAYS present in the system prompt, unlike
-      // lessons which compete with 25+ other memories for the top 5 slots.
-      await maybeUpskillAgent(step.id, step.assigned_agent_id, step.description);
+        console.log(`[worker] Review #${approval.id}: REJECTED (${totalRejections}x). REVISION CAP REACHED. Step failed, escalating.`);
 
-      console.log(`[worker] Review #${approval.id}: REJECTED. Step sent back for revision.`);
+      } else {
+        // Normal rejection flow — save memories and lessons
+        await memory.saveMemory({
+          agentId: approval.reviewer_agent_id,
+          memoryType: 'decision',
+          content: `Rejected deliverable for step #${step.id}: ${result.content.substring(0, 300)}`,
+          summary: `Rejected step #${step.id} — sent back for revision (${totalRejections}/3)`,
+          topicTags: ['qa-review', 'rejection'],
+          importance: 6,
+          sourceType: 'review'
+        });
+
+        // LESSON FROM REJECTION: The original agent learns from the feedback.
+        // WHY: Rejection feedback is the highest-value learning signal.
+        await generateLessonFromRejection(
+          step.assigned_agent_id,
+          step.description,
+          result.content
+        );
+
+        // PERSONA UPSKILLING: If an agent fails 5+ times on the same step, their persona
+        // is permanently upgraded with new expertise. (With 3-strike cap, this naturally
+        // never triggers — but kept for safety in case the cap is raised later.)
+        await maybeUpskillAgent(step.id, step.assigned_agent_id, step.description);
+
+        console.log(`[worker] Review #${approval.id}: REJECTED (${totalRejections}/3). Step sent back for revision.`);
+      }
 
     } else {
       // Approved (default if ambiguous — better to ship than block)

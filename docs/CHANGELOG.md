@@ -4,6 +4,37 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.9.1] — 2026-02-24 (Linear Status Sync + Revision Cap)
+
+### Fixed
+- **Linear cache empty in Worker:** Worker process never called `linear.initialize()`, so every `updateIssueStatus()` from worker failed with "Unknown workflow state." Added `ensureInitialized()` lazy init that auto-populates the Linear cache on first use from any process. Called at top of `updateIssueStatus()`, `syncStepToLinear()`, `updateIssueCustomField()`, `addIssueComment()`, `syncDecomposedProjectToLinear()`.
+- **Infinite review loop (Mission #75 bug):** No revision cap existed — QA could reject indefinitely, creating loops. Added 3-strike cap: after 3 rejections, step is failed and founder is alerted via Discord with Linear ticket links. Each rejection posted as a comment on the Linear ticket.
+- **Linear issues stuck in Backlog:** All status updates (In Progress, In Review, Done, Canceled) now work because worker auto-initializes the Linear cache.
+- **Failed steps not synced to Linear:** `failStep()` now syncs "Canceled" status to the Linear issue (fire-and-forget).
+
+### Added
+- **Dependency linking in Linear (`createDependencyRelations()`):** After syncing a decomposed project, Linear issues are linked with blocking/blocked-by relations matching the DAG dependencies. Called automatically at end of `syncDecomposedProjectToLinear()`.
+- **Revision cap alert handler (`discord_bot.js`):** `announceAlerts()` now processes `revision_cap_reached` events — posts to #alerts with the step description and Linear ticket URL.
+- **`countStepRejections()` in `missions.js`:** Counts past rejections for a step from `approval_chain`. Used by worker for the 3-strike cap check.
+- **TDD Tests:** 10 new tests in `tests/linear/linear-status-sync.test.js`.
+
+### Modified
+- **`src/lib/linear.js`:** Lazy init (`ensureInitialized()`), dependency relations (`createDependencyRelations()`), `__setCache()` sets initialized flag, new exports.
+- **`src/worker.js`:** 3-strike revision cap in `processNextReview()` rejection block. Each rejection posted as Linear comment. Cap reached → `failStep()` + event log.
+- **`src/discord_bot.js`:** `announceAlerts()` handles `revision_cap_reached` events with Linear URL lookup.
+- **`src/lib/missions.js`:** `failStep()` syncs Canceled to Linear. New `countStepRejections()` export.
+
+### Cost Impact
+- Zero additional LLM cost (all changes are API calls + DB queries)
+- Linear API calls: ~1-2 per rejection (comment + status), ~N per decomposed project (dependency relations)
+
+### Notes
+- All 394 tests pass (384 existing + 10 new, zero regressions).
+- No SQL migration needed — uses existing tables (`approval_chain`, `linear_sync`, `step_dependencies`, `events`).
+- Decisions: D-034, D-035.
+
+---
+
 ## [0.9.0] — 2026-02-23 (Autonomous Team Execution)
 
 ### Added

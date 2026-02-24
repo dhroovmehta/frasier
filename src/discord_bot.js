@@ -1314,6 +1314,32 @@ async function announceAlerts() {
     await events.markProcessed([evt.id]);
   }
 
+  // Post revision cap alerts — 3 rejections, step failed, needs founder attention
+  const revisionCapEvents = await events.getUnprocessedEvents('revision_cap_reached');
+  for (const evt of revisionCapEvents) {
+    // Get Linear ticket URL for the step so Dhroov can click through
+    let linearUrl = '';
+    try {
+      const { data: sync } = await supabase
+        .from('linear_sync')
+        .select('entity_url')
+        .eq('mission_step_id', evt.data?.stepId)
+        .eq('entity_type', 'issue')
+        .maybeSingle();
+      if (sync?.entity_url) linearUrl = `\n[View in Linear](${sync.entity_url})`;
+    } catch (err) {
+      // Non-blocking — URL is nice-to-have
+    }
+
+    await sendSplit(alertChannel,
+      `**Revision Cap Reached** — ${evt.description}` +
+      `\nThe step was rejected ${evt.data?.rejectionCount || 3} times and has been failed.` +
+      `\nReview the rejection comments in Linear and decide next steps.` +
+      linearUrl
+    );
+    await events.markProcessed([evt.id]);
+  }
+
   // Post agent upskill notifications
   const upskillEvents = await events.getUnprocessedEvents('agent_upskilled');
   const updatesChannel = channels['updates'] || channels['general'];

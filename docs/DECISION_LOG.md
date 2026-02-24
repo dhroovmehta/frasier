@@ -4,6 +4,34 @@ All architectural and design decisions, with context and trade-offs.
 
 ---
 
+## D-035: 3-Strike Revision Cap
+
+**Date:** Feb 24, 2026 | **Status:** Active | **Author:** Zero + Frasier
+
+**Context:** Mission #75 entered an infinite review loop — Sahaquiel's work was rejected by Toji repeatedly (3+ times observed, would continue indefinitely). Scores were 3.8-4.25 but Toji kept rejecting. No cap existed. The existing `maybeUpskillAgent()` at 5 rejections would never stop the loop.
+
+**Decision:** After 3 total rejections on the same step, fail the step and escalate to the founder via Discord with Linear ticket links. Each rejection is also posted as a comment on the Linear ticket for full audit trail.
+
+**Rationale:** 3 strikes is enough signal that the agent cannot self-correct for this task. Founder intervention is needed — either the task is wrong, the agent isn't suited, or the QA criteria are miscalibrated. Better to stop and surface the problem than waste LLM budget on infinite loops.
+
+**Trade-offs:** `maybeUpskillAgent` (threshold 5) naturally never triggers with cap at 3. Left in place for safety in case the cap is raised later. One extra DB write when cap is reached (sendBackForRevision then failStep override), but correctness > efficiency for a 30s poll loop.
+
+---
+
+## D-034: Lazy Linear Cache Initialization
+
+**Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Worker.js is a separate PM2 process from heartbeat.js. Heartbeat calls `linear.initialize()` on startup which populates `cache.workflowStates`. Worker never calls initialize, so every `updateIssueStatus()` from worker fails with "Unknown workflow state: In Progress." All Linear status updates (In Progress, In Review, Done) silently failed.
+
+**Decision:** Added `ensureInitialized()` as a lazy init guard at the top of every cache-reading function. Uses a boolean flag — first call does the full initialization, subsequent calls are no-ops. Both `initialize()` (heartbeat) and `__setCache()` (tests) set the flag.
+
+**Rationale:** Simpler than requiring worker.js to call initialize() on startup (which would duplicate the heartbeat's initialization logic and add startup latency). Lazy init means any process that touches Linear gets initialized automatically, including future processes.
+
+**Trade-offs:** First Linear API call from worker has ~500ms extra latency for initialization. Subsequent calls are instant. Acceptable for a 10-second poll loop.
+
+---
+
 ## D-001: Minimalist Architecture (PostgreSQL + Node.js Workers)
 
 **Date:** Feb 11, 2026 | **Status:** Active | **Author:** Zero + Kai

@@ -4,6 +4,34 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-014: Infinite review loop — Mission #75 stuck in reject/revise cycle
+
+**Date:** Feb 24, 2026 | **Severity:** High | **Status:** Fixed (v0.9.1)
+
+**Symptom:** Mission #75 entered an infinite loop: Sahaquiel produced work → Toji rejected → Sahaquiel revised → Toji rejected again → repeat. Scores hovered at 3.8–4.25 (decent but never passing Toji's threshold). No cap existed to break the cycle.
+
+**Root Cause:** `processNextReview()` in `worker.js` always called `sendBackForRevision()` on rejection, with no limit on how many times a step could be rejected. The rejection/revision loop had no exit condition.
+
+**Fix:** 3-strike revision cap (D-035). `countStepRejections()` queries `approval_chain` for past rejections. On the 3rd rejection, `failStep()` is called instead of `sendBackForRevision()`, a `revision_cap_reached` event is logged, and the founder is alerted via Discord.
+
+**Files:** `src/worker.js`, `src/lib/missions.js`, `src/discord_bot.js`
+
+---
+
+## ISS-013: Linear tickets stuck in Backlog — worker never initializes cache
+
+**Date:** Feb 24, 2026 | **Severity:** Critical | **Status:** Fixed (v0.9.1)
+
+**Symptom:** All Linear tickets created by `syncDecomposedProjectToLinear()` stayed in "Backlog" status. `updateIssueStatus()` and `updateIssueCustomField()` calls silently failed because the workflow state/label cache was empty.
+
+**Root Cause:** `linear.initialize()` is only called in `heartbeat.js`. The `worker.js` process (separate PM2 process) never calls it, so the module-level cache (`workflowStates`, `labels`) is always empty. Every status update silently returned early with "workflow state not found".
+
+**Fix:** Lazy initialization pattern (D-034). Added `ensureInitialized()` with a boolean flag, called at the top of `syncStepToLinear()`, `updateIssueStatus()`, `updateIssueCustomField()`, `addIssueComment()`, and `syncDecomposedProjectToLinear()`. First call from any process auto-populates the cache; subsequent calls are no-ops.
+
+**Files:** `src/lib/linear.js`
+
+---
+
 ## ISS-012: OpenRouter rejects date-suffixed model IDs (T2/T3 always fall back to T1)
 
 **Date:** Feb 17, 2026 | **Severity:** Critical | **Status:** Fixed

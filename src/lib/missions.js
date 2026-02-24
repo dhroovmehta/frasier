@@ -454,7 +454,35 @@ async function failStep(stepId, errorMessage) {
     console.error(`[missions] Failed to mark step #${stepId} as failed:`, error.message);
     return null;
   }
+
+  // Sync to Linear (fire-and-forget)
+  linear.updateIssueStatus(stepId, 'Canceled').catch(err =>
+    console.error(`[linear] Fail sync failed (non-blocking): ${err.message}`)
+  );
+
   return data;
+}
+
+/**
+ * Count how many times a step has been rejected in the approval chain.
+ * WHY: Used by worker.js to enforce the 3-strike revision cap.
+ * Only counts past rejections (already in DB), not the current review.
+ *
+ * @param {number} stepId
+ * @returns {number}
+ */
+async function countStepRejections(stepId) {
+  const { data, error } = await supabase
+    .from('approval_chain')
+    .select('id')
+    .eq('mission_step_id', stepId)
+    .eq('status', 'rejected');
+
+  if (error) {
+    console.error(`[missions] Failed to count rejections for step #${stepId}:`, error.message);
+    return 0;
+  }
+  return data?.length || 0;
 }
 
 /**
@@ -908,6 +936,8 @@ module.exports = {
   routeByKeywords,
   canTeamHandle,
   checkMissionCompletion,
+  // Revision cap
+  countStepRejections,
   // Multi-step mission chains
   parsePhases,
   isPreviousStepComplete,

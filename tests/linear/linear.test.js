@@ -73,8 +73,13 @@ beforeEach(() => {
   // Default: LINEAR_API_KEY is set
   process.env.LINEAR_API_KEY = 'lin_test_key_123';
   process.env.LINEAR_TEAM_ID = 'team-uuid-123';
-  // Reset linear module's internal cache
+  // Reset linear module's internal cache and mark as initialized
+  // WHY: These tests focus on individual API functions, not the lazy init
+  // behavior (tested in linear-status-sync.test.js). Setting cache to {}
+  // with initialized=true prevents ensureInitialized() from consuming
+  // mock fetch responses intended for the actual test.
   linear.__resetCache();
+  linear.__setCache({});
 });
 
 afterEach(() => {
