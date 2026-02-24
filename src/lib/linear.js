@@ -449,6 +449,135 @@ async function syncCritiqueScore(stepId) {
 }
 
 // ============================================================
+// DECOMPOSED PROJECT SYNC (v0.9.0)
+// ============================================================
+
+/**
+ * Sync a decomposed project to Linear: 1 project + N issues.
+ * Fire-and-forget safe — never throws, never blocks execution.
+ *
+ * @param {Object} params
+ * @param {number} params.missionId
+ * @param {string} params.title - Project title
+ * @param {Object} params.plan - Decomposition plan with tasks array
+ * @param {Array} params.steps - Created mission steps
+ */
+async function syncDecomposedProjectToLinear({ missionId, title, plan, steps }) {
+  if (!process.env.LINEAR_API_KEY) return null;
+
+  try {
+    // 1. Create Linear project
+    const polishedProject = await polishTitleAndDescription(title);
+
+    const teamId = process.env.LINEAR_TEAM_ID;
+    const projectData = await linearRequest(
+      `mutation ProjectCreate($input: ProjectCreateInput!) {
+        projectCreate(input: $input) {
+          success
+          project { id url slugId }
+        }
+      }`,
+      {
+        input: {
+          name: polishedProject.title,
+          description: `${polishedProject.description}\n\nEnd state: ${plan.end_state || 'production_docs'}\nTasks: ${plan.tasks.length}\nParallel groups: ${[...new Set(plan.tasks.map(t => t.parallel_group))].length}`,
+          teamIds: teamId ? [teamId] : []
+        }
+      }
+    );
+
+    if (!projectData?.projectCreate?.success) return null;
+
+    const project = projectData.projectCreate.project;
+
+    // Save project sync record
+    await supabase.from('linear_sync').insert({
+      entity_type: 'project',
+      entity_id: project.id,
+      entity_url: project.url,
+      mission_id: missionId,
+      sync_type: 'decomposed_project',
+      status: 'synced',
+      synced_at: new Date().toISOString()
+    });
+
+    console.log(`[linear] Decomposed project synced → ${project.url} (${plan.tasks.length} tasks)`);
+
+    // 2. Create one Linear issue per task
+    for (let i = 0; i < plan.tasks.length; i++) {
+      const task = plan.tasks[i];
+      const step = steps[i];
+
+      try {
+        const polished = await polishTitleAndDescription(
+          `${task.description}\n\nAcceptance Criteria: ${task.acceptance_criteria}`
+        );
+
+        // Build labels: agent + work type + parallel group + system
+        const labelIds = [];
+        if (cache?.labels) {
+          // Work type label from required_role
+          const workType = WORK_TYPE_MAP[task.required_role];
+          if (workType && cache.labels[workType]) {
+            labelIds.push(cache.labels[workType]);
+          }
+
+          // System label
+          if (cache.labels['frasier-managed']) {
+            labelIds.push(cache.labels['frasier-managed']);
+          }
+        }
+
+        const input = {
+          title: `[Wave ${task.parallel_group}] ${polished.title}`,
+          description: polished.description,
+          teamId,
+          projectId: project.id
+        };
+
+        if (labelIds.length > 0) {
+          input.labelIds = labelIds;
+        }
+
+        const issueData = await linearRequest(
+          `mutation IssueCreate($input: IssueCreateInput!) {
+            issueCreate(input: $input) {
+              success
+              issue { id identifier url }
+            }
+          }`,
+          { input }
+        );
+
+        if (issueData?.issueCreate?.success) {
+          const issue = issueData.issueCreate.issue;
+
+          await supabase.from('linear_sync').insert({
+            entity_type: 'issue',
+            entity_id: issue.id,
+            entity_identifier: issue.identifier,
+            entity_url: issue.url,
+            mission_id: missionId,
+            mission_step_id: step?.id || null,
+            sync_type: 'decomposed_task',
+            status: 'synced',
+            synced_at: new Date().toISOString()
+          });
+        }
+      } catch (issueErr) {
+        // Individual issue sync failure doesn't block others
+        console.error(`[linear] Issue sync failed for task ${task.id}: ${issueErr.message}`);
+      }
+    }
+
+    return project;
+  } catch (err) {
+    console.error(`[linear] syncDecomposedProjectToLinear failed: ${err.message}`);
+    return null;
+  }
+}
+
+// ============================================================
 // LINEAR → FRASIER (WEBHOOK)
 // ============================================================
 
@@ -877,6 +1006,7 @@ module.exports = {
   completeProject,
   cancelProject,
   syncCritiqueScore,
+  syncDecomposedProjectToLinear,
   ensureLabelsExist,
   ensureCustomFieldsExist,
   ensureWorkflowStatesExist,

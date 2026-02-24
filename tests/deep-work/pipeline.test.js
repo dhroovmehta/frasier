@@ -181,18 +181,19 @@ beforeEach(() => {
     };
   });
 
-  // Default: search returns results
+  // Default: search returns results (3 per query so research gets enough substantive sources)
   mockSearchWeb.mockResolvedValue({
     results: [
       { title: 'K-12 AI Tutoring Market Report', url: 'https://example.com/report', snippet: 'The K-12 AI tutoring market reached $2.3B in 2025...' },
-      { title: 'Top AI Tutoring Platforms 2026', url: 'https://example.com/competitors', snippet: 'Khan Academy, Squirrel AI, and Carnegie Learning lead...' }
+      { title: 'Top AI Tutoring Platforms 2026', url: 'https://example.com/competitors', snippet: 'Khan Academy, Squirrel AI, and Carnegie Learning lead...' },
+      { title: 'EdTech Investment Trends', url: 'https://example.com/investment', snippet: 'EdTech funding trends 2025-2026...' }
     ],
     error: null
   });
 
-  // Default: page fetch returns content
+  // Default: page fetch returns substantive content (>500 chars to avoid research retry logic)
   mockFetchPage.mockResolvedValue({
-    content: 'According to Grand View Research, the global AI in education market was valued at $2.3 billion in 2025 and is expected to grow at a CAGR of 36.0% from 2025 to 2030.',
+    content: 'According to Grand View Research, the global AI in education market was valued at $2.3 billion in 2025 and is expected to grow at a CAGR of 36.0% from 2025 to 2030. Key players include Khan Academy (valued at $800M), Squirrel AI ($600M in revenue), Carnegie Learning ($450M annual), and emerging startups like Photomath and Quizlet AI. The North American market represents 42% of global spending, followed by Asia-Pacific at 38%. Integration of adaptive learning algorithms has increased student engagement by 47% on average, while reducing teacher workload by approximately 15 hours per month per classroom.',
     title: 'AI in Education Market Report',
     url: 'https://example.com/report',
     error: null
@@ -240,12 +241,13 @@ describe('pipeline.execute() — full pipeline flow', () => {
 
   test('revise phase fires when critique score < 3', async () => {
     // Override critique to return low score
+    let critiqueCallCount = 0;
     mockCallLLM.mockImplementation(async ({ userMessage }) => {
       if (userMessage && userMessage.includes('DECOMPOSE')) {
         return {
           content: JSON.stringify({
-            subQuestions: ['What is the market size?'],
-            searchQueries: ['AI tutoring market size'],
+            subQuestions: ['What is the market size?', 'Who are the competitors?'],
+            searchQueries: ['AI tutoring market size', 'AI tutoring competitors'],
             keyRequirements: ['Market data']
           }),
           model: 'minimax', tier: 'tier1',
@@ -262,16 +264,27 @@ describe('pipeline.execute() — full pipeline flow', () => {
         };
       }
       if (userMessage && userMessage.includes('CRITIQUE')) {
+        critiqueCallCount++;
+        if (critiqueCallCount === 1) {
+          return {
+            content: JSON.stringify({
+              scores: { completeness: 2, accuracy: 1, actionability: 2, depth: 2 },
+              overallScore: 1.8,
+              gaps: ['No real data cited', 'No competitor names', 'Completely generic'],
+              lesson: 'Must include specific data from web research'
+            }),
+            model: 'minimax', tier: 'tier1',
+            usage: { prompt_tokens: 300, completion_tokens: 150 },
+            error: null
+          };
+        }
+        // Post-revision critique passes
         return {
           content: JSON.stringify({
-            scores: { completeness: 2, dataBacked: 1, actionability: 2, depth: 2 },
-            overallScore: 1.8,
-            gaps: ['No real data cited', 'No competitor names', 'Completely generic'],
-            lesson: 'Must include specific data from web research'
+            scores: { completeness: 4, accuracy: 4, actionability: 4, depth: 4 },
+            overallScore: 4.0, gaps: [], lesson: 'Much improved'
           }),
-          model: 'minimax', tier: 'tier1',
-          usage: { prompt_tokens: 300, completion_tokens: 150 },
-          error: null
+          model: 'minimax', tier: 'tier1', usage: { prompt_tokens: 300, completion_tokens: 150 }, error: null
         };
       }
       if (userMessage && userMessage.includes('REVISE')) {
@@ -293,23 +306,26 @@ describe('pipeline.execute() — full pipeline flow', () => {
       effectiveTier: 'tier2'
     });
 
-    // Should have called LLM 4 times: decompose + synthesize + critique + revise
-    expect(mockCallLLM).toHaveBeenCalledTimes(4);
+    // v0.9.0: critique + revise + re-critique loop
+    // decompose + synthesize + critique(1) + revise + critique(2) = 5
+    expect(mockCallLLM).toHaveBeenCalledTimes(5);
 
     // Final content should be the revised version
     expect(result.content).toContain('Revised Analysis');
-    expect(result.critiqueScore).toBeLessThan(3);
     expect(result.revised).toBe(true);
+    // Final score is from the post-revision critique
+    expect(result.critiqueScore).toBe(4.0);
   });
 
-  test('revise capped at 1 attempt (no infinite loops)', async () => {
-    // Both critique and post-revise return low scores
+  test('revise capped at 2 attempts (no infinite loops)', async () => {
+    // All critiques return low scores — tests the max revision cap
     let critiqueCallCount = 0;
+    let reviseCallCount = 0;
     mockCallLLM.mockImplementation(async ({ userMessage }) => {
       if (userMessage && userMessage.includes('DECOMPOSE')) {
         return {
           content: JSON.stringify({
-            subQuestions: ['Q1'], searchQueries: ['query1'], keyRequirements: ['R1']
+            subQuestions: ['Q1', 'Q2'], searchQueries: ['query1', 'query2'], keyRequirements: ['R1']
           }),
           model: 'minimax', tier: 'tier1', usage: {}, error: null
         };
@@ -321,7 +337,7 @@ describe('pipeline.execute() — full pipeline flow', () => {
         critiqueCallCount++;
         return {
           content: JSON.stringify({
-            scores: { completeness: 1, dataBacked: 1, actionability: 1, depth: 1 },
+            scores: { completeness: 1, accuracy: 1, actionability: 1, depth: 1 },
             overallScore: 1.0,
             gaps: ['Everything is wrong'],
             lesson: 'Needs complete redo'
@@ -330,7 +346,8 @@ describe('pipeline.execute() — full pipeline flow', () => {
         };
       }
       if (userMessage && userMessage.includes('REVISE')) {
-        return { content: 'Still bad revised output', model: 'claude-sonnet', tier: 'tier2', usage: {}, error: null };
+        reviseCallCount++;
+        return { content: `Still bad attempt ${reviseCallCount}`, model: 'claude-sonnet', tier: 'tier2', usage: {}, error: null };
       }
       return { content: 'Default', model: 'minimax', tier: 'tier1', usage: {}, error: null };
     });
@@ -343,13 +360,12 @@ describe('pipeline.execute() — full pipeline flow', () => {
       effectiveTier: 'tier2'
     });
 
-    // Critique should only be called once (NOT re-critiqued after revision)
-    expect(critiqueCallCount).toBe(1);
+    // v0.9.0: max 2 revisions with re-critique after each
+    // critique(1) + revise(1) + critique(2) + revise(2) + critique(3) = 3 critiques, 2 revisions
+    expect(critiqueCallCount).toBe(3);
+    expect(reviseCallCount).toBe(2);
 
-    // Total LLM calls: decompose + synthesize + critique + revise = 4
-    expect(mockCallLLM).toHaveBeenCalledTimes(4);
-
-    // Should still return a result (the revised version, even if still bad)
+    // Should still return a result (the last revision, even if still bad)
     expect(result.content).toBeTruthy();
     expect(result.revised).toBe(true);
   });
@@ -627,19 +643,20 @@ describe('error handling', () => {
   });
 
   test('returns error when synthesize LLM call fails', async () => {
-    // Decompose succeeds
-    mockCallLLM
-      .mockResolvedValueOnce({
-        content: JSON.stringify({
-          subQuestions: ['Q1'], searchQueries: ['query1'], keyRequirements: ['R1']
-        }),
-        model: 'minimax', tier: 'tier1', usage: {}, error: null
-      })
-      // Synthesize fails
-      .mockResolvedValueOnce({
-        content: null, model: 'claude-sonnet', tier: 'tier2',
-        usage: {}, error: 'Rate limited'
-      });
+    mockCallLLM.mockImplementation(async ({ userMessage }) => {
+      if (userMessage && userMessage.includes('DECOMPOSE')) {
+        return {
+          content: JSON.stringify({
+            subQuestions: ['Q1', 'Q2'], searchQueries: ['query1', 'query2'], keyRequirements: ['R1']
+          }),
+          model: 'minimax', tier: 'tier1', usage: {}, error: null
+        };
+      }
+      if (userMessage && userMessage.includes('SYNTHESIZE')) {
+        return { content: null, model: 'claude-sonnet', tier: 'tier2', usage: {}, error: 'Rate limited' };
+      }
+      return { content: 'Default', model: 'minimax', tier: 'tier1', usage: {}, error: null };
+    });
 
     const step = makeResearchStep();
     const result = await pipeline.execute({
@@ -766,11 +783,14 @@ describe('synthesize phase — prompt construction', () => {
       effectiveTier: 'tier2'
     });
 
-    // The synthesize call should contain research data
-    const synthesizeCall = mockCallLLM.mock.calls[1][0];
-    expect(synthesizeCall.userMessage).toContain('SYNTHESIZE');
+    // Find the synthesize call by content (index varies due to research retry logic)
+    const synthesizeCall = mockCallLLM.mock.calls.find(
+      call => call[0].userMessage && call[0].userMessage.includes('SYNTHESIZE')
+    );
+    expect(synthesizeCall).toBeDefined();
+    expect(synthesizeCall[0].userMessage).toContain('SYNTHESIZE');
     // Should include fetched page content or search snippets
-    expect(synthesizeCall.userMessage).toMatch(/research|data|source/i);
+    expect(synthesizeCall[0].userMessage).toMatch(/research|data|source/i);
   });
 
   test('synthesize uses agent system prompt from promptData', async () => {
@@ -782,8 +802,12 @@ describe('synthesize phase — prompt construction', () => {
       effectiveTier: 'tier2'
     });
 
-    const synthesizeCall = mockCallLLM.mock.calls[1][0];
-    expect(synthesizeCall.systemPrompt).toContain('Edward');
+    // Find the synthesize call by content (index varies due to research retry logic)
+    const synthesizeCall = mockCallLLM.mock.calls.find(
+      call => call[0].userMessage && call[0].userMessage.includes('SYNTHESIZE')
+    );
+    expect(synthesizeCall).toBeDefined();
+    expect(synthesizeCall[0].systemPrompt).toContain('Edward');
   });
 });
 

@@ -4,6 +4,45 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.9.0] — 2026-02-23 (Autonomous Team Execution)
+
+### Added
+- **Task Decomposition Engine (`src/lib/decomposition.js`):** Frasier breaks full-project directives into parallel/sequential task DAGs via T2 LLM call. Validates dependency graph (Kahn's algorithm cycle detection), creates mission steps with proper dependencies, triggers proactive hiring for missing roles, and escalates to founder only when genuinely needed. Approach memory from prior decompositions injected as hints.
+- **Message Classification (`src/discord_bot.js`):** Dedicated T1 LLM call classifies every Discord message as `casual`, `simple_task`, or `full_project` before routing. Replaces brittle action-tag parsing (`[ACTION:PROPOSAL]`, `[ACTION:NEW_PROJECT]`). Defaults to `simple_task` at confidence < 0.7. Persisted to `message_classifications` table.
+- **DAG-Based Step Execution (`src/lib/missions.js`, `src/worker.js`):** Steps now track dependencies via `step_dependencies` table instead of rigid `step_order` chains. `areAllDependenciesMet()` returns tri-state (true/false/null) for DAG vs legacy fallback. Worker claims up to 3 eligible steps per tick, executes sequentially (1GB RAM safe). Predecessor outputs from all dependencies injected as context.
+- **Research Depth & Citation Enforcement (`src/lib/pipeline.js`):** Research phase requires 3+ substantive sources (retries with refined queries, max 2 retries). Structured source list passed to synthesis. `validateSourceCitations()` computes citation_score via string matching (zero LLM cost). Every role's output template includes citation requirement.
+- **Calibrated Self-Critique (`src/lib/pipeline.js`):** Replaced generic 1-5 rating with rubric-based 4-dimension scoring (depth, accuracy, actionability, completeness) with concrete anchors. Calibration: "3.0 is GOOD, 5.0 is rare." Revision triggers when ANY dimension < 3.0 or average < 3.5. Max 2 revision attempts (up from 1).
+- **Hybrid Skill Encoding (`src/lib/skill_encodings.js`):** D-028 implementation. 5 skill encodings with distilled instructions always in persona + full content injected on-demand when topic tags match trigger keywords. Role-based applicability. 3000-token budget guard.
+- **Decomposed Project Linear Sync (`src/lib/linear.js`):** `syncDecomposedProjectToLinear()` creates 1 Linear project + N issues (one per task) with wave/work-type labels. Fire-and-forget — sync failure never blocks execution.
+- **QA Scope Adjustment (`src/lib/conversations.js`):** When Ein (QA) reviews non-engineering domain work, review prompt limits scope to technical quality, completeness, and citation accuracy. Domain expertise judgment left to the assigned SME agent.
+- **SQL Migration:** `sql/006_task_decomposition.sql` — `message_classifications`, `step_dependencies`, `decomposition_plans`, `escalation_log` tables + decomposition policy row.
+- **TDD Tests:** 131 new tests across 8 test suites (`tests/v09/`).
+
+### Modified
+- **`src/discord_bot.js`:** Message classification replaces action-tag parsing. `classifyMessage()` as separate T1 call before Frasier response. Casual messages get simplified prompt (saves ~400 tokens).
+- **`src/lib/missions.js`:** `getPendingSteps()` now checks DAG dependencies first, falls back to legacy `step_order` for backward compatibility. New exports: `areAllDependenciesMet()`, `getPredecessorOutputs()`.
+- **`src/worker.js`:** Claims up to 3 steps per tick. Extracted `executeStep()` function. DAG context injection from all predecessor outputs, legacy single-parent fallback preserved.
+- **`src/lib/pipeline.js`:** Research depth enforcement (3+ sources, retry logic), citation validation, calibrated 4-dimension critique rubric, max 2 revision attempts.
+- **`src/lib/context.js`:** Citation requirement added to all output templates.
+- **`src/lib/memory.js`:** Skill encoding injection in `buildAgentPrompt()`.
+- **`src/lib/conversations.js`:** `buildEnhancedReviewPrompt()` accepts `options` param for QA scope limitation (backward compatible).
+- **`src/lib/linear.js`:** New `syncDecomposedProjectToLinear()` for decomposed project sync.
+
+### Cost Impact
+- Message classification: ~$0.001 per Discord message (T1 MiniMax)
+- Decomposition: ~$0.01-0.05 per project (T2 Sonnet)
+- Research retries: ~$0.002-0.01 per step (T1 MiniMax for refined queries)
+- Skill encoding: 0-3000 extra tokens per prompt (on-demand only)
+- Zero new npm dependencies, zero new PM2 processes
+
+### Notes
+- All 379 tests pass (248 existing + 131 new, zero regressions).
+- Backward compatible: legacy `step_order` chains still work for existing missions.
+- `simple_task` classification routes to exact same proposal pipeline — existing flow unchanged.
+- Decomposition fallback: if LLM returns invalid JSON, creates single-mission with full directive.
+
+---
+
 ## [0.8.0] — 2026-02-23 (Linear Integration — Mission Control)
 
 ### Added

@@ -54,6 +54,10 @@ Rules:
 /**
  * Build the synthesize prompt. Combines task + research data + quality context
  * into a single prompt for producing the actual deliverable.
+ *
+ * WHY structured sources section: Agents need an explicit, enumerated list of
+ * available sources so they can cite them precisely. The anti-hallucination
+ * instruction ("Use ONLY these sources") prevents fabricated data.
  */
 function buildSynthesizePrompt(taskDescription, researchData, subQuestions) {
   let prompt = `## SYNTHESIZE — Produce the deliverable
@@ -61,7 +65,15 @@ function buildSynthesizePrompt(taskDescription, researchData, subQuestions) {
 **Task:** ${taskDescription}`;
 
   if (researchData && researchData.length > 0) {
-    prompt += '\n\n## RESEARCH DATA (real web sources — cite these)\n';
+    // Structured source reference list — gives the LLM a clear inventory to cite from
+    prompt += '\n\n## AVAILABLE SOURCES\n';
+    for (let i = 0; i < researchData.length; i++) {
+      const item = researchData[i];
+      prompt += `\n**[${i + 1}]** ${item.title || item.url}\n- URL: ${item.url}\n- Key data: ${(item.content || '').slice(0, 200)}...\n`;
+    }
+
+    // Full source content for deep reference
+    prompt += '\n\n## RESEARCH DATA (full source content)\n';
     for (const item of researchData) {
       prompt += `\n### Source: ${item.title || item.url}\nURL: ${item.url}\n${item.content}\n`;
     }
@@ -75,6 +87,7 @@ function buildSynthesizePrompt(taskDescription, researchData, subQuestions) {
   }
 
   prompt += `\n\n## CRITICAL REQUIREMENTS
+- Use ONLY these sources for factual claims. If data is not available in these sources, state "data not available" — never fabricate.
 - Use SPECIFIC data from the research sources above — cite URLs
 - If data is unavailable for a claim, explicitly state "data not found" rather than inventing numbers
 - Produce the ACTUAL deliverable, not a description of what it should contain
@@ -85,9 +98,12 @@ function buildSynthesizePrompt(taskDescription, researchData, subQuestions) {
 
 /**
  * Build the self-critique prompt. Agent evaluates its own work.
+ * WHY citationScore param: Phase 2 research quality produces an automated citation
+ * score (0-1). We inject it here so the LLM factors hard data into its accuracy
+ * assessment rather than relying purely on vibes.
  */
-function buildCritiquePrompt(taskDescription, deliverable) {
-  return `## CRITIQUE YOUR OWN WORK
+function buildCritiquePrompt(taskDescription, deliverable, citationScore) {
+  let prompt = `## CRITIQUE YOUR OWN WORK
 
 You just produced the following deliverable. Now evaluate it honestly.
 
@@ -100,7 +116,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
 {
   "scores": {
     "completeness": <1-5>,
-    "dataBacked": <1-5>,
+    "accuracy": <1-5>,
     "actionability": <1-5>,
     "depth": <1-5>
   },
@@ -109,12 +125,43 @@ Respond with ONLY a JSON object (no markdown, no explanation):
   "lesson": "one sentence about what to do differently next time"
 }
 
-Scoring guide:
-- 5: Exceptional — executive-ready, all claims data-backed, actionable
-- 4: Good — solid work with minor gaps
-- 3: Acceptable — meets basic requirements but lacks depth
-- 2: Below standard — missing key data or too generic
-- 1: Unacceptable — hallucinated data, surface-level, or off-topic`;
+## SCORING RUBRIC — Use these anchors for each dimension:
+
+**DEPTH:**
+- 1.0: generic, could be from any AI
+- 2.0: some specifics but mostly surface
+- 3.0: solid domain knowledge, specific examples
+- 4.0: expert-level analysis with novel connections
+- 5.0: groundbreaking insight, publishable quality
+
+**ACCURACY:**
+- 1.0: fabricated facts or hallucinated data
+- 2.0: some claims unverified
+- 3.0: most claims sourced or reasonable
+- 4.0: all claims cross-referenced, sources cited
+- 5.0: every claim verified with primary sources
+
+**ACTIONABILITY:**
+- 1.0: vague advice, no specifics
+- 2.0: some recommendations but lacks detail
+- 3.0: clear next steps with owners
+- 4.0: detailed playbook with timelines and metrics
+- 5.0: ready-to-execute blueprint with contingencies
+
+**COMPLETENESS:**
+- 1.0: addresses less than 50% of requirements
+- 2.0: major sections missing
+- 3.0: all sections present, some thin
+- 4.0: comprehensive, minor gaps only
+- 5.0: exhaustive, anticipates follow-up questions
+
+CALIBRATION: 3.0 is GOOD work. 4.0 is EXCELLENT. 5.0 is rare — reserve for truly exceptional output. Average output should score 2.5-3.0. Be BRUTALLY HONEST — inflated scores help nobody.`;
+
+  if (citationScore !== undefined && citationScore !== null) {
+    prompt += `\n\nNOTE: Automated citation check found citation_score: ${citationScore}. Factor this into your ACCURACY scoring.`;
+  }
+
+  return prompt;
 }
 
 /**
@@ -206,14 +253,11 @@ async function runDecompose(step, taskDescription, approachHints) {
 }
 
 /**
- * Execute the research phase. Pure web search — no LLM calls.
- * Searches the web for each query from decompose, then fetches top pages.
- *
- * @returns {{ researchData: Array<{title, url, content}>, durationMs }}
+ * Execute a single round of web research for the given search queries.
+ * Returns raw results — counting and retry logic handled by runResearch().
  */
-async function runResearch(step, searchQueries) {
-  const startTime = Date.now();
-  const researchData = [];
+async function executeSearchRound(step, searchQueries) {
+  const results = [];
   let totalFetches = 0;
   const MAX_FETCHES = 8;
 
@@ -226,7 +270,6 @@ async function runResearch(step, searchQueries) {
       continue;
     }
 
-    // Fetch top 2 pages per query
     for (const result of searchResult.results.slice(0, 2)) {
       if (totalFetches >= MAX_FETCHES) break;
 
@@ -238,7 +281,7 @@ async function runResearch(step, searchQueries) {
         continue;
       }
 
-      researchData.push({
+      results.push({
         title: page.title || result.title,
         url: result.url,
         content: page.content,
@@ -247,10 +290,114 @@ async function runResearch(step, searchQueries) {
     }
   }
 
-  const durationMs = Date.now() - startTime;
-  console.log(`[pipeline] Step #${step.id}: Research phase found ${researchData.length} sources (${totalFetches} fetches)`);
+  return { results, totalFetches };
+}
 
-  return { researchData, durationMs };
+/**
+ * Count "substantive" sources — pages with >500 chars of content.
+ * Thin pages (listicles, error pages, paywalled stubs) don't count.
+ */
+function countSubstantiveSources(researchData) {
+  const SUBSTANTIVE_THRESHOLD = 500;
+  return researchData.filter(r => (r.content || '').length >= SUBSTANTIVE_THRESHOLD).length;
+}
+
+/**
+ * Build structured source list with metadata for each source.
+ * Used by research phase logging and synthesis prompt injection.
+ */
+function buildStructuredSources(researchData) {
+  return researchData.map(r => ({
+    url: r.url,
+    title: r.title || r.url,
+    charCount: (r.content || '').length,
+    keyDataPoints: (r.content || '').slice(0, 200)
+  }));
+}
+
+/**
+ * Ask the LLM to generate refined search queries when initial research is insufficient.
+ * Uses T1 (cheap) since this is meta-work.
+ */
+async function generateRefinedQueries(step, originalQueries, taskDescription) {
+  const result = await models.callLLM({
+    systemPrompt: 'You are a search query optimization assistant. Respond only with valid JSON.',
+    userMessage: `## REFINE_QUERIES — Generate better search queries
+
+The following queries did not return enough substantive results:
+${originalQueries.map(q => `- "${q}"`).join('\n')}
+
+Original task: ${taskDescription}
+
+Generate 2-3 refined queries that are more specific and likely to return data-rich results.
+Respond with ONLY JSON: {"refinedQueries": ["query1", "query2"]}`,
+    agentId: step.assigned_agent_id,
+    missionStepId: step.id,
+    forceTier: 'tier1'
+  });
+
+  if (result.error) return [];
+
+  try {
+    const cleaned = result.content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return parsed.refinedQueries || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Execute the research phase. Searches the web, validates source quality,
+ * and retries with refined queries if insufficient substantive sources found.
+ *
+ * WHY retry logic: The original research phase accepted whatever came back,
+ * even if it was all thin/paywalled content. Now we require >= 3 substantive
+ * sources (>500 chars) and retry up to 2 times with LLM-refined queries.
+ *
+ * @returns {{ researchData, structuredSources, substantiveSources, retriesAttempted, durationMs }}
+ */
+async function runResearch(step, searchQueries, taskDescription) {
+  const startTime = Date.now();
+  const MIN_SUBSTANTIVE = 3;
+  const MAX_RETRIES = 2;
+
+  let researchData = [];
+  let retriesAttempted = 0;
+  let currentQueries = searchQueries;
+
+  // Initial search round
+  const initial = await executeSearchRound(step, currentQueries);
+  researchData = initial.results;
+
+  // WHY: Retry with refined queries when sources are insufficient.
+  // Thin content (paywalled, stubs, error pages) doesn't count as substantive.
+  let substantiveCount = countSubstantiveSources(researchData);
+  while (substantiveCount < MIN_SUBSTANTIVE && retriesAttempted < MAX_RETRIES) {
+    retriesAttempted++;
+    console.log(`[pipeline] Step #${step.id}: Only ${substantiveCount} substantive sources, retrying (${retriesAttempted}/${MAX_RETRIES})`);
+
+    const refinedQueries = await generateRefinedQueries(step, currentQueries, taskDescription || '');
+    if (refinedQueries.length === 0) break;
+
+    currentQueries = refinedQueries;
+    const retry = await executeSearchRound(step, refinedQueries);
+    // Merge new results (dedup by URL)
+    const existingUrls = new Set(researchData.map(r => r.url));
+    for (const result of retry.results) {
+      if (!existingUrls.has(result.url)) {
+        researchData.push(result);
+        existingUrls.add(result.url);
+      }
+    }
+    substantiveCount = countSubstantiveSources(researchData);
+  }
+
+  const structuredSources = buildStructuredSources(researchData);
+  const durationMs = Date.now() - startTime;
+  console.log(`[pipeline] Step #${step.id}: Research phase found ${researchData.length} sources (${substantiveCount} substantive, ${retriesAttempted} retries)`);
+
+  return { researchData, structuredSources, substantiveSources: substantiveCount, retriesAttempted, durationMs };
 }
 
 /**
@@ -288,11 +435,15 @@ async function runSynthesize(step, promptData, taskDescription, researchData, su
  * Execute the self-critique phase. Agent evaluates its own work.
  * Uses tier1 (cheap) since this is evaluation, not creation.
  *
- * @returns {{ overallScore, gaps, lesson, raw, tokens, durationMs }}
+ * @param {Object} step - The mission step being evaluated
+ * @param {string} taskDescription - The original task description
+ * @param {string} deliverable - The deliverable content to critique
+ * @param {number} [citationScore] - Optional citation score from Phase 2 research quality (0-1)
+ * @returns {{ overallScore, scores, gaps, lesson, raw, tokens, durationMs }}
  */
-async function runCritique(step, taskDescription, deliverable) {
+async function runCritique(step, taskDescription, deliverable, citationScore) {
   const startTime = Date.now();
-  const prompt = buildCritiquePrompt(taskDescription, deliverable);
+  const prompt = buildCritiquePrompt(taskDescription, deliverable, citationScore);
 
   const result = await models.callLLM({
     systemPrompt: 'You are a quality reviewer. Evaluate work honestly and respond only with valid JSON.',
@@ -326,16 +477,25 @@ async function runCritique(step, taskDescription, deliverable) {
     // Non-JSON critique — try to extract a score from the text
     console.log(`[pipeline] Step #${step.id}: Critique returned non-JSON, defaulting to score 3.0`);
     parsed = {
-      scores: { completeness: 3, dataBacked: 3, actionability: 3, depth: 3 },
+      scores: { completeness: 3, accuracy: 3, actionability: 3, depth: 3 },
       overallScore: 3.0,
       gaps: [],
       lesson: null
     };
   }
 
+  // WHY: Backward compatibility — the old prompt used "dataBacked" but we
+  // renamed to "accuracy" for clarity. If the LLM returns the old field name,
+  // normalize it so downstream code always sees "accuracy".
+  const scores = parsed.scores || {};
+  if (scores.dataBacked !== undefined && scores.accuracy === undefined) {
+    scores.accuracy = scores.dataBacked;
+    delete scores.dataBacked;
+  }
+
   return {
     overallScore: parsed.overallScore || 3.0,
-    scores: parsed.scores || {},
+    scores,
     gaps: parsed.gaps || [],
     lesson: parsed.lesson || null,
     raw: result.content,
@@ -373,6 +533,53 @@ async function runRevise(step, promptData, taskDescription, originalContent, cri
     tokens: result.usage,
     durationMs
   };
+}
+
+// ============================================================
+// CITATION VALIDATION
+// ============================================================
+
+/**
+ * Validate that URLs cited in the output actually came from research sources.
+ * Computes a citation score (0-1) based on how many factual paragraphs have citations.
+ *
+ * WHY: Agents sometimes hallucinate URLs or cite sources not in the research data.
+ * This is a zero-LLM-cost check (string matching only) that catches fabrication.
+ *
+ * @param {string} output - The synthesized deliverable content
+ * @param {Array<{url: string}>} researchSources - Structured source list from research phase
+ * @returns {{ citedUrls, uncitedUrls, citationScore, citedClaims, totalFactualClaims }}
+ */
+function validateSourceCitations(output, researchSources) {
+  const sourceUrls = new Set((researchSources || []).map(s => s.url));
+
+  // Extract all URLs mentioned in the output (in [Source: URL] or [URL] patterns, or bare URLs)
+  const urlPattern = /https?:\/\/[^\s\])"]+/g;
+  const foundUrls = [...new Set((output.match(urlPattern) || []))];
+
+  const citedUrls = foundUrls.filter(url => sourceUrls.has(url));
+  const uncitedUrls = foundUrls.filter(url => !sourceUrls.has(url));
+
+  // Count factual paragraphs: non-empty lines that aren't just headers or whitespace
+  const paragraphs = output.split('\n').filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    if (trimmed.startsWith('#')) return false; // Headers
+    if (trimmed.startsWith('---')) return false; // Dividers
+    if (trimmed.startsWith('- **[')) return false; // Source list items
+    return trimmed.length > 30; // Substantive paragraphs only
+  });
+
+  const totalFactualClaims = paragraphs.length;
+
+  // Count paragraphs that contain at least one cited URL
+  const citedClaims = paragraphs.filter(para => {
+    return citedUrls.some(url => para.includes(url));
+  }).length;
+
+  const citationScore = totalFactualClaims > 0 ? citedClaims / totalFactualClaims : 0;
+
+  return { citedUrls, uncitedUrls, citationScore, citedClaims, totalFactualClaims };
 }
 
 // ============================================================
@@ -472,13 +679,15 @@ async function execute({ step, promptData, userMessage, effectiveTier, config = 
   phases.push({ name: 'decompose', durationMs: decompose.durationMs });
 
   // ──────────────────────────────────────────────
-  // PHASE 2: RESEARCH (skippable)
+  // PHASE 2: RESEARCH (skippable, with retry logic)
   // ──────────────────────────────────────────────
   let researchData = [];
+  let structuredSources = [];
   if (!config.skipResearch) {
     console.log(`[pipeline] Step #${step.id}: Starting RESEARCH phase (${decompose.searchQueries.length} queries)`);
-    const research = await runResearch(step, decompose.searchQueries);
+    const research = await runResearch(step, decompose.searchQueries, userMessage);
     researchData = research.researchData;
+    structuredSources = research.structuredSources;
 
     await logPhase(step.id, 'research', 2, {
       content: researchData.map(r => `[${r.title}](${r.url})`).join('\n'),
@@ -486,7 +695,10 @@ async function execute({ step, promptData, userMessage, effectiveTier, config = 
       durationMs: research.durationMs,
       metadata: {
         queriesExecuted: decompose.searchQueries.length,
-        sourcesFound: researchData.length
+        sourcesFound: researchData.length,
+        substantiveSources: research.substantiveSources,
+        retriesAttempted: research.retriesAttempted,
+        structuredSources: research.structuredSources
       }
     });
     phases.push({ name: 'research', durationMs: research.durationMs });
@@ -514,44 +726,75 @@ async function execute({ step, promptData, userMessage, effectiveTier, config = 
   phases.push({ name: 'synthesize', durationMs: synthesize.durationMs });
 
   // ──────────────────────────────────────────────
-  // PHASE 4: SELF-CRITIQUE
+  // CITATION VALIDATION (zero LLM cost — string matching)
   // ──────────────────────────────────────────────
-  console.log(`[pipeline] Step #${step.id}: Starting CRITIQUE phase`);
-  const critique = await runCritique(step, userMessage, synthesize.content);
+  let citationScore = config.citationScore !== undefined ? config.citationScore : null;
+  if (citationScore === null && structuredSources.length > 0) {
+    const citationResult = validateSourceCitations(synthesize.content, structuredSources);
+    citationScore = citationResult.citationScore;
+  }
 
-  await logPhase(step.id, 'critique', 4, {
-    content: critique.raw,
-    modelTier: 'tier1',
-    tokens: critique.tokens,
-    durationMs: critique.durationMs,
-    score: critique.overallScore,
-    metadata: {
+  // ──────────────────────────────────────────────
+  // PHASE 4: SELF-CRITIQUE + REVISION LOOP (max 2 revisions)
+  // WHY: New revision triggers — ANY dimension < 3.0 OR average < 3.5.
+  // Re-critiques after each revision to verify improvement.
+  // ──────────────────────────────────────────────
+  const MAX_REVISIONS = 2;
+  let currentContent = synthesize.content;
+  let finalCritique = null;
+  let revised = false;
+  let revisionCount = 0;
+
+  for (let attempt = 0; attempt <= MAX_REVISIONS; attempt++) {
+    console.log(`[pipeline] Step #${step.id}: Starting CRITIQUE phase${attempt > 0 ? ` (post-revision ${attempt})` : ''}`);
+    const critique = await runCritique(step, userMessage, currentContent, citationScore);
+
+    const critiqueMetadata = {
       scores: critique.scores,
       gaps: critique.gaps
+    };
+    if (citationScore !== null) {
+      critiqueMetadata.citationScore = citationScore;
     }
-  });
-  phases.push({ name: 'critique', durationMs: critique.durationMs });
 
-  console.log(`[pipeline] Step #${step.id}: Critique score: ${critique.overallScore}/5`);
+    await logPhase(step.id, 'critique', 4 + (attempt * 2), {
+      content: critique.raw,
+      modelTier: 'tier1',
+      tokens: critique.tokens,
+      durationMs: critique.durationMs,
+      score: critique.overallScore,
+      metadata: critiqueMetadata
+    });
+    phases.push({ name: 'critique', durationMs: critique.durationMs });
 
-  // ──────────────────────────────────────────────
-  // PHASE 5: REVISE (conditional — only if score < 3)
-  // ──────────────────────────────────────────────
-  let finalContent = synthesize.content;
-  let revised = false;
+    console.log(`[pipeline] Step #${step.id}: Critique score: ${critique.overallScore}/5`);
+    finalCritique = critique;
 
-  if (critique.overallScore < 3) {
-    console.log(`[pipeline] Step #${step.id}: Score ${critique.overallScore} < 3 — starting REVISE phase`);
+    // WHY: Check both per-dimension and average thresholds.
+    // ANY single weak dimension drags the whole deliverable down.
+    const scores = critique.scores || {};
+    const dimValues = Object.values(scores).filter(v => typeof v === 'number');
+    const anyDimBelowThreshold = dimValues.some(v => v < 3.0);
+    const avgScore = dimValues.length > 0
+      ? dimValues.reduce((a, b) => a + b, 0) / dimValues.length
+      : critique.overallScore;
+    const needsRevision = anyDimBelowThreshold || avgScore < 3.5;
+
+    if (!needsRevision || attempt >= MAX_REVISIONS) break;
+
+    // ── REVISE ──
+    revisionCount++;
+    console.log(`[pipeline] Step #${step.id}: Revision ${revisionCount}/${MAX_REVISIONS} — ${anyDimBelowThreshold ? 'dimension below 3.0' : 'average below 3.5'}`);
     const revise = await runRevise(
-      step, promptData, userMessage, synthesize.content,
+      step, promptData, userMessage, currentContent,
       critique, researchData, effectiveTier
     );
 
     if (!revise.error && revise.content) {
-      finalContent = revise.content;
+      currentContent = revise.content;
       revised = true;
 
-      await logPhase(step.id, 'revise', 5, {
+      await logPhase(step.id, 'revise', 5 + ((attempt) * 2), {
         content: revise.content,
         modelTier: effectiveTier,
         tokens: revise.tokens,
@@ -559,16 +802,17 @@ async function execute({ step, promptData, userMessage, effectiveTier, config = 
       });
       phases.push({ name: 'revise', durationMs: revise.durationMs });
     } else {
-      console.log(`[pipeline] Step #${step.id}: Revise failed (${revise.error}), using original synthesize output`);
+      console.log(`[pipeline] Step #${step.id}: Revise failed (${revise.error}), keeping current content`);
+      break; // Revision failed, stop trying
     }
   }
 
-  console.log(`[pipeline] Step #${step.id}: Pipeline complete (${phases.length} phases, score: ${critique.overallScore}, revised: ${revised})`);
+  console.log(`[pipeline] Step #${step.id}: Pipeline complete (${phases.length} phases, score: ${finalCritique.overallScore}, revised: ${revised}, revisions: ${revisionCount})`);
 
   return {
-    content: finalContent,
-    critiqueScore: critique.overallScore,
-    critiqueLesson: critique.lesson,
+    content: currentContent,
+    critiqueScore: finalCritique.overallScore,
+    critiqueLesson: finalCritique.lesson,
     revised,
     phases,
     error: null
@@ -600,5 +844,6 @@ async function getCritiquePhase(missionStepId) {
 
 module.exports = {
   execute,
-  getCritiquePhase
+  getCritiquePhase,
+  validateSourceCitations
 };

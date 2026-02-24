@@ -111,6 +111,106 @@ client.on(Events.MessageCreate, async (message) => {
 });
 
 // ============================================================
+// MESSAGE CLASSIFICATION (v0.9.0)
+// ============================================================
+
+const supabase = require('./lib/supabase');
+
+const VALID_CLASSIFICATIONS = ['casual', 'simple_task', 'full_project'];
+
+/**
+ * Classify a Discord message as casual / simple_task / full_project.
+ * WHY: Separate T1 call determines routing BEFORE Frasier's response.
+ * This replaces the old action tag parsing with a dedicated classifier
+ * that's cheaper, faster, and more reliable.
+ *
+ * @param {string} messageContent - The raw message text from Zero
+ * @param {string} discordMessageId - Discord message ID for audit trail
+ * @returns {{ classification, confidence, reasoning }}
+ */
+async function classifyMessage(messageContent, discordMessageId) {
+  try {
+    const result = await models.callLLM({
+      systemPrompt: 'You are a message classifier for an AI agent organization. Respond only with valid JSON.',
+      userMessage: `Classify this message from the founder into exactly one category.
+
+MESSAGE: "${messageContent}"
+
+Categories:
+- "casual" — Greetings, small talk, opinions, status questions, jokes, thank-yous. No work expected.
+- "simple_task" — A single deliverable request: research, analysis, comparison, content creation, vetting, recommendations. One agent can handle it.
+- "full_project" — A major initiative requiring multiple phases, multiple agents, or cross-functional work. Examples: "build me an X", "launch a product line", "create a complete strategy for Y".
+
+Respond with ONLY JSON (no markdown, no explanation):
+{"classification": "casual|simple_task|full_project", "confidence": 0.0-1.0, "reasoning": "brief explanation"}`,
+      agentId: 'frasier',
+      forceTier: 'tier1'
+    });
+
+    if (result.error) {
+      console.log(`[classification] LLM error: ${result.error}, defaulting to simple_task`);
+      return await persistClassification(messageContent, discordMessageId, {
+        classification: 'simple_task', confidence: 0, reasoning: 'LLM call failed'
+      });
+    }
+
+    // Parse JSON — handle markdown fences
+    let parsed;
+    try {
+      const cleaned = result.content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      console.log(`[classification] JSON parse failed, defaulting to simple_task`);
+      return await persistClassification(messageContent, discordMessageId, {
+        classification: 'simple_task', confidence: 0, reasoning: 'JSON parse failed'
+      });
+    }
+
+    // Validate classification value
+    if (!VALID_CLASSIFICATIONS.includes(parsed.classification)) {
+      console.log(`[classification] Invalid classification "${parsed.classification}", defaulting to simple_task`);
+      parsed.classification = 'simple_task';
+    }
+
+    // Default to simple_task when confidence is low — safer than guessing full_project
+    const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0;
+    if (confidence < 0.7 && parsed.classification !== 'simple_task') {
+      console.log(`[classification] Low confidence ${confidence} for "${parsed.classification}", defaulting to simple_task`);
+      parsed.classification = 'simple_task';
+    }
+
+    return await persistClassification(messageContent, discordMessageId, {
+      classification: parsed.classification,
+      confidence,
+      reasoning: parsed.reasoning || ''
+    });
+  } catch (err) {
+    console.error(`[classification] Unexpected error: ${err.message}`);
+    return { classification: 'simple_task', confidence: 0, reasoning: 'Classification error' };
+  }
+}
+
+/**
+ * Persist classification to message_classifications table for audit trail.
+ * Returns the classification result for use by routing logic.
+ */
+async function persistClassification(messageContent, discordMessageId, classification) {
+  await supabase.from('message_classifications').insert({
+    discord_message_id: discordMessageId,
+    sender_id: 'zero',
+    raw_message: messageContent,
+    classification: classification.classification,
+    confidence: classification.confidence,
+    reasoning: classification.reasoning,
+    action_taken: classification.classification === 'casual' ? 'response'
+      : classification.classification === 'full_project' ? 'decomposition'
+      : 'proposal'
+  });
+
+  return classification;
+}
+
+// ============================================================
 // MESSAGE HANDLING
 // ============================================================
 
@@ -1420,6 +1520,12 @@ function detectFounderDirective(content) {
 
   return false;
 }
+
+// ============================================================
+// EXPORTS (for testing)
+// ============================================================
+
+module.exports = { classifyMessage };
 
 // ============================================================
 // STARTUP

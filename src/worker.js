@@ -59,16 +59,34 @@ async function main() {
 // ============================================================
 
 async function processNextStep() {
-  const pendingSteps = await missions.getPendingSteps(1);
+  // Claim up to 3 eligible steps per tick (v0.9.0 parallel execution)
+  const pendingSteps = await missions.getPendingSteps(3);
   if (pendingSteps.length === 0) return;
 
-  const step = pendingSteps[0];
-  const claimed = await missions.claimStep(step.id);
-  if (!claimed) {
-    console.log(`[worker] Step #${step.id} already claimed, skipping`);
-    return;
+  // Claim all eligible steps, then execute sequentially (not Promise.all — 1GB RAM)
+  const claimedSteps = [];
+  for (const step of pendingSteps) {
+    const claimed = await missions.claimStep(step.id);
+    if (claimed) {
+      claimedSteps.push(step);
+    } else {
+      console.log(`[worker] Step #${step.id} already claimed, skipping`);
+    }
   }
 
+  if (claimedSteps.length === 0) return;
+  console.log(`[worker] Claimed ${claimedSteps.length} step(s) this tick`);
+
+  for (const step of claimedSteps) {
+    await executeStep(step);
+  }
+}
+
+/**
+ * Execute a single claimed step. Extracted from processNextStep for
+ * sequential multi-step execution (v0.9.0).
+ */
+async function executeStep(step) {
   console.log(`[worker] Processing step #${step.id}: "${step.description.substring(0, 60)}..."`);
   console.log(`[worker]   Agent: ${step.assigned_agent_id}, Tier: ${step.model_tier}`);
 
@@ -97,9 +115,19 @@ async function processNextStep() {
     const enrichedStep = { ...step, description: enrichedText };
     let userMessage = await context.buildTaskContext(enrichedStep, agentRole);
 
-    // CHAIN CONTEXT: If this step has a parent, inject the parent's result
-    // so the agent builds on the previous phase's output.
-    if (step.parent_step_id) {
+    // CHAIN CONTEXT: Inject predecessor outputs for context continuity.
+    // v0.9.0 DAG path: multiple predecessors via step_dependencies table.
+    // Legacy path: single parent via parent_step_id column.
+    const predecessorOutputs = await missions.getPredecessorOutputs(step.id);
+    if (predecessorOutputs.length > 0) {
+      // DAG path — inject all predecessor outputs
+      const contextParts = predecessorOutputs.map(p =>
+        `## PREDECESSOR OUTPUT (from ${p.agentName})\n${p.result}`
+      );
+      userMessage = `${contextParts.join('\n\n---\n\n')}\n\n---\n\n${userMessage}`;
+      console.log(`[worker] Step #${step.id}: Injected ${predecessorOutputs.length} DAG predecessor context(s)`);
+    } else if (step.parent_step_id) {
+      // Legacy path — single parent step
       const parentData = await missions.getParentStepResult(step.parent_step_id);
       if (parentData) {
         const truncatedResult = parentData.result.substring(0, 6000);

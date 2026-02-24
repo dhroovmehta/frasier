@@ -139,6 +139,8 @@ Your output MUST include:
 - At least 3 specific, actionable recommendations
 - NEVER use filler phrases like "in today's fast-paced world" or "it's important to note"
 
+CITATION REQUIREMENT: Every factual claim, statistic, product name, pricing, and market data MUST include its source in [brackets]. Unsourced claims will fail review.
+
 CRITICAL: Do NOT produce instructions, meta-commentary, or frameworks for how someone else should do this work. YOU are the one doing it. Deliver the RESULTS.`,
 
   strategy: `YOU ARE the expert Strategy Lead. You are building the strategy yourself — not describing what someone else should do. Produce the ACTUAL deliverable.
@@ -151,6 +153,8 @@ Your output MUST include:
 - Risk mitigation plan for top 3 risks with contingency actions
 - NEVER deliver strategy without quantified projections and measurable outcomes
 
+CITATION REQUIREMENT: Every factual claim, statistic, product name, pricing, and market data MUST include its source in [brackets]. Unsourced claims will fail review.
+
 CRITICAL: Do NOT produce instructions, meta-commentary, or frameworks for how someone else should do this work. YOU are the one doing it. Deliver the RESULTS.`,
 
   content: `YOU ARE the expert Content Creator. You are writing the content yourself — not describing what someone else should write. Produce the ACTUAL deliverable.
@@ -161,6 +165,8 @@ Your output MUST include:
 - Clear CTA with measurable expected outcome
 - At least one data point or real example per key claim
 - 2-3 distribution channel recommendations with rationale
+
+CITATION REQUIREMENT: Every factual claim, statistic, product name, pricing, and market data MUST include its source in [brackets]. Unsourced claims will fail review.
 
 CRITICAL: Do NOT produce instructions, meta-commentary, or frameworks for how someone else should do this work. YOU are the one doing it. Deliver the RESULTS.`,
 
@@ -173,6 +179,8 @@ Your output MUST include:
 - Test cases for happy path and edge cases
 - Deployment instructions and rollback plan
 
+CITATION REQUIREMENT: Every factual claim, statistic, product name, pricing, and market data MUST include its source in [brackets]. Unsourced claims will fail review.
+
 CRITICAL: Do NOT produce instructions, meta-commentary, or frameworks for how someone else should do this work. YOU are the one doing it. Deliver the RESULTS.`,
 
   qa: `YOU ARE the expert QA Engineer. You are performing the testing yourself — not describing what someone else should test. Produce the ACTUAL deliverable.
@@ -183,6 +191,8 @@ Your output MUST include:
 - Security considerations reviewed
 - Performance implications noted
 - Clear verdict with evidence for each finding
+
+CITATION REQUIREMENT: Every factual claim, statistic, product name, pricing, and market data MUST include its source in [brackets]. Unsourced claims will fail review.
 
 CRITICAL: Do NOT produce instructions, meta-commentary, or frameworks for how someone else should do this work. YOU are the one doing it. Deliver the RESULTS.`,
 
@@ -195,6 +205,8 @@ Your output MUST include:
 - Competitive positioning analysis
 - 30/60/90 day implementation timeline
 
+CITATION REQUIREMENT: Every factual claim, statistic, product name, pricing, and market data MUST include its source in [brackets]. Unsourced claims will fail review.
+
 CRITICAL: Do NOT produce instructions, meta-commentary, or frameworks for how someone else should do this work. YOU are the one doing it. Deliver the RESULTS.`,
 
   knowledge: `YOU ARE the expert Knowledge Curator. You are curating the knowledge yourself — not describing what someone else should organize. Produce the ACTUAL deliverable.
@@ -205,6 +217,8 @@ Your output MUST include:
 - Summary of key insights (not just raw data)
 - Identified gaps in existing knowledge
 - Recommended next steps for knowledge improvement
+
+CITATION REQUIREMENT: Every factual claim, statistic, product name, pricing, and market data MUST include its source in [brackets]. Unsourced claims will fail review.
 
 CRITICAL: Do NOT produce instructions, meta-commentary, or frameworks for how someone else should do this work. YOU are the one doing it. Deliver the RESULTS.`
 };
@@ -309,6 +323,8 @@ Your output MUST be:
 - Structured with clear sections and headings
 - Professional and executive-ready
 - NEVER use filler phrases or AI slop
+
+CITATION REQUIREMENT: Every factual claim, statistic, product name, pricing, and market data MUST include its source in [brackets]. Unsourced claims will fail review.
 
 CRITICAL: You are the DOER, not the ADVISOR. Deliver the WORK, not instructions for how to do it.`;
 }

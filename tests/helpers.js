@@ -105,6 +105,70 @@ function makePersona(agentId, overrides = {}) {
   };
 }
 
+function makeClassification(overrides = {}) {
+  return {
+    id: overrides.id || idCounter++,
+    discord_message_id: overrides.discord_message_id || `msg-${Date.now()}`,
+    sender_id: overrides.sender_id || 'zero',
+    raw_message: overrides.raw_message || 'Test message',
+    classification: overrides.classification || 'simple_task',
+    confidence: overrides.confidence !== undefined ? overrides.confidence : 0.85,
+    reasoning: overrides.reasoning || 'Test classification reasoning',
+    action_taken: overrides.action_taken || 'proposal',
+    proposal_id: overrides.proposal_id || null,
+    project_id: overrides.project_id || null,
+    created_at: overrides.created_at || new Date().toISOString(),
+    ...overrides
+  };
+}
+
+function makeDependency(overrides = {}) {
+  return {
+    id: overrides.id || idCounter++,
+    step_id: overrides.step_id || null,
+    depends_on_step_id: overrides.depends_on_step_id || null,
+    dependency_type: overrides.dependency_type || 'blocks',
+    created_at: overrides.created_at || new Date().toISOString(),
+    ...overrides
+  };
+}
+
+function makeDecompositionPlan(overrides = {}) {
+  return {
+    id: overrides.id || idCounter++,
+    project_id: overrides.project_id || null,
+    mission_id: overrides.mission_id || null,
+    plan_json: overrides.plan_json || { tasks: [], metadata: {} },
+    task_count: overrides.task_count || 0,
+    parallel_groups: overrides.parallel_groups || 1,
+    estimated_phases: overrides.estimated_phases || 1,
+    end_state: overrides.end_state || 'production_docs',
+    decomposed_by: overrides.decomposed_by || 'frasier',
+    approach_memory_used: overrides.approach_memory_used || false,
+    refinement_count: overrides.refinement_count || 0,
+    status: overrides.status || 'active',
+    created_at: overrides.created_at || new Date().toISOString(),
+    updated_at: overrides.updated_at || new Date().toISOString(),
+    ...overrides
+  };
+}
+
+function makeEscalation(overrides = {}) {
+  return {
+    id: overrides.id || idCounter++,
+    project_id: overrides.project_id || null,
+    mission_id: overrides.mission_id || null,
+    step_id: overrides.step_id || null,
+    escalation_type: overrides.escalation_type || 'ambiguity',
+    reason: overrides.reason || 'Test escalation reason',
+    resolved: overrides.resolved || false,
+    resolution: overrides.resolution || null,
+    resolved_at: overrides.resolved_at || null,
+    created_at: overrides.created_at || new Date().toISOString(),
+    ...overrides
+  };
+}
+
 function resetIdCounter() {
   idCounter = 1;
 }
@@ -116,5 +180,9 @@ module.exports = {
   makeMission,
   makeStep,
   makePersona,
+  makeClassification,
+  makeDependency,
+  makeDecompositionPlan,
+  makeEscalation,
   resetIdCounter
 };

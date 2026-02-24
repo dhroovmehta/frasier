@@ -1,6 +1,120 @@
 # Frasier — Completed Features
 
-> Last updated: Feb 23, 2026 (v0.7.0)
+> Last updated: Feb 23, 2026 (v0.9.0)
+
+---
+
+## Autonomous Team Execution (v0.9.0)
+
+### Task Decomposition Engine
+- **File:** `src/lib/decomposition.js`
+- Frasier decomposes full-project directives into parallel/sequential task DAGs
+- T2 LLM call with: directive, agent roster, approach memory hints
+- Structured JSON output: tasks with IDs, dependencies, parallel groups, required roles, acceptance criteria
+- `validateDependencyGraph()` — Kahn's algorithm topological sort rejects cyclic dependencies
+- `createStepsFromPlan()` — two-pass: creates steps first, then dependency rows (maps task IDs to step IDs)
+- Proactive hiring: `autoHireGapAgent()` per `hiring_needed` entry before creating steps
+- Escalation: logs to `escalation_log` when founder input genuinely needed, halts step creation
+- Approach memory: retrieves similar past approaches as decomposition hints, saves successful plans
+- Fallback: invalid JSON → creates single-mission with full directive (never blocks execution)
+
+### Message Classification
+- **File:** `src/discord_bot.js` — `classifyMessage()`
+- Dedicated T1 LLM call classifies every Discord message: `casual` / `simple_task` / `full_project`
+- Separate from Frasier's response (clean separation of classification vs. conversation)
+- Defaults to `simple_task` when confidence < 0.7
+- Persisted to `message_classifications` table with reasoning
+- Routing:
+  - `casual` → conversational response (simplified prompt, ~400 tokens saved)
+  - `simple_task` → existing proposal pipeline (backward compatible)
+  - `full_project` → decomposition engine
+- Replaces brittle action-tag parsing (`[ACTION:PROPOSAL]`, `[ACTION:NEW_PROJECT]`)
+
+### DAG-Based Step Execution
+- **File:** `src/lib/missions.js`, `src/worker.js`
+- `step_dependencies` table tracks inter-step dependencies (replaces rigid `step_order`)
+- `areAllDependenciesMet(stepId)` — tri-state return:
+  - `true` → all DAG dependencies satisfied, step is eligible
+  - `false` → at least one dependency unsatisfied, step is blocked
+  - `null` → no DAG dependencies exist, use legacy `step_order` check
+- `getPredecessorOutputs(stepId)` — fetches results from all completed dependencies (truncated to 6000 chars each)
+- Worker claims up to 3 eligible steps per tick, executes sequentially (not `Promise.all` — 1GB RAM safety)
+- Predecessor outputs injected as context: `## PREDECESSOR OUTPUT (from AgentName)`
+- Full backward compatibility: legacy `step_order` chains work for existing missions
+
+### Research Depth & Citation Enforcement
+- **File:** `src/lib/pipeline.js` (research phase), `src/lib/context.js` (output templates)
+- Research phase requires 3+ substantive sources (>500 chars of content)
+- If < 3 sources: generates refined queries via T1, retries search (max 2 retries)
+- Structured source list passed to synthesis: `[{ url, title, keyDataPoints, charCount }]`
+- Synthesis prompt includes `## AVAILABLE SOURCES` + "Use ONLY these sources for factual claims"
+- `validateSourceCitations(output, researchSources)` — string-matching citation validator (zero LLM cost)
+- `citation_score` stored in critique phase metadata
+- Every role's output template includes: "Every factual claim MUST include its source in [brackets]"
+
+### Calibrated Self-Critique
+- **File:** `src/lib/pipeline.js` (critique phase)
+- 4-dimension rubric scoring with concrete anchors:
+  - DEPTH: 1.0 (generic) → 5.0 (expert-level, novel connections)
+  - ACCURACY: 1.0 (fabricated facts) → 5.0 (every claim cross-referenced)
+  - ACTIONABILITY: 1.0 (vague advice) → 5.0 (ready-to-execute blueprint)
+  - COMPLETENESS: 1.0 (<50% of request) → 5.0 (exhaustive)
+- Calibration anchors: "3.0 is GOOD work. 5.0 is rare. Average = 2.5-3.0."
+- `citation_score` from Phase 2 injected into accuracy dimension context
+- Revision triggers: ANY dimension < 3.0 OR average < 3.5
+- Max 2 revision attempts (up from 1)
+- All 4 dimension scores stored in `pipeline_phases.metadata`
+
+### Hybrid Skill Encoding (D-028)
+- **File:** `src/lib/skill_encodings.js`
+- 5 skill encodings from vetted Claude Code skills:
+  - task-coordination-strategies → Frasier (orchestration)
+  - design-orchestration → Frasier (risk, escalation)
+  - task-execution-engine → All agents (task format, self-assessment)
+  - writing-plans → Frasier + Engineering (plan structure)
+  - dispatching-parallel-agents → Frasier (parallel dispatch)
+- **Base layer:** ~100-200 token distilled instructions always in persona (role-filtered)
+- **On-demand layer:** Full skill content injected when topic tags match trigger keywords
+- 3000-token budget guard prevents prompt bloat
+- Injected via `buildSkillInjection(role, topicTags)` in `buildAgentPrompt()`
+
+### QA Scope Adjustment
+- **File:** `src/lib/conversations.js` — `buildEnhancedReviewPrompt()`
+- When QA (Ein) reviews non-engineering domain work:
+  - Adds scope limitation: "Evaluate technical quality, completeness, and citation accuracy ONLY"
+  - "Do not judge domain expertise — the assigned agent is the subject matter expert"
+- Engineering tasks: Ein gets full review scope (domain + technical)
+- Non-QA reviewers (team leads): always full scope regardless of task role
+- Backward compatible via optional `options` parameter
+
+### Decomposed Project Linear Sync
+- **File:** `src/lib/linear.js` — `syncDecomposedProjectToLinear()`
+- Creates 1 Linear project per decomposed plan
+- Creates N Linear issues (one per task) with `[Wave X]` prefix
+- Work type labels + frasier-managed label on each issue
+- Sync records saved to `linear_sync` table
+- Fire-and-forget — individual issue sync failure doesn't block others
+
+### Database (SQL Migration 006)
+- **File:** `sql/006_task_decomposition.sql`
+- `message_classifications` — persists Discord message classification results
+- `step_dependencies` — DAG dependency tracking between mission steps
+- `decomposition_plans` — stores structured plans with task graphs
+- `escalation_log` — tracks founder escalation requests and resolutions
+- Decomposition policy row in `policy` table
+- RLS + service_role policies, indexes on FKs and query patterns
+
+### Tests
+- 131 new tests across 8 suites in `tests/v09/`
+- `schema.test.js` (6): new table helpers and factories
+- `research-quality.test.js` (12): source depth, citation validation, anti-hallucination
+- `critique-calibration.test.js` (10): rubric scoring, calibration anchors, revision triggers
+- `classification.test.js` (8): message classification, routing, persistence
+- `decomposition.test.js` (22): decompose, DAG validation, step creation, hiring, escalation, approach memory
+- `dag-execution.test.js` (17): DAG eligibility, backward compat, context flow, chaining
+- `skill-encoding.test.js` (7): distilled + on-demand injection, role filtering, token budget
+- `linear-decomposition.test.js` (7): Linear sync, QA scope adjustment
+- Total: 379 tests across 26 suites, zero regressions
 
 ---
 

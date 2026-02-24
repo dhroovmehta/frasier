@@ -377,3 +377,108 @@ Fallback chain: T3→T2→T1 if higher tier fails.
 **Trade-offs:** Depends on Linear's free tier (250 active issues). At current throughput (~5-10 missions/week) this is fine. Custom fields require Linear UI or API setup.
 
 **Files:** `src/lib/linear.js`, `src/lib/missions.js`, `src/heartbeat.js`, `src/discord_bot.js`, `sql/005_linear_integration.sql`
+
+---
+
+## D-028: Hybrid Skill Encoding — Lean Personas + On-Demand Full Injection
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** 5 of 7 installed Claude Code skills contain patterns applicable to runtime agents (task decomposition, dependency tracking, design orchestration, etc.). Need to decide how to embed this knowledge into agent system prompts for LLM calls. Three options: (A) full skill content always in prompt, (B) distilled bullet points only, (C) hybrid.
+
+**Decision:** Hybrid approach (Option C):
+- **Base layer:** Distill each skill's key patterns into ~100-200 token compact instructions. These live in the agent's persona and are always present — low cost, always available.
+- **On-demand layer:** Full skill content injected into the prompt only when the agent is actively performing that specific task type (e.g., full decomposition skill loads only when Frasier is decomposing a project).
+
+**Applicable skills and targets:**
+- task-coordination-strategies → Frasier (decomposition, dependency graphs)
+- design-orchestration → Frasier (risk assessment, escalation logic)
+- task-execution-engine → All agents (task format, acceptance criteria, self-assessment)
+- writing-plans → Frasier + Spike (plan structure, TDD)
+- dispatching-parallel-agents → Frasier (parallel task dispatch prompts)
+
+**Rationale:** Agents make many LLM calls daily. Stacking 3-4 full skills (500-2,000 tokens each) onto every call wastes budget. But distilled-only loses nuance when the agent genuinely needs the full methodology. Hybrid gives lean-by-default, comprehensive-when-it-matters.
+
+**Trade-offs:** Slightly more complex prompt construction — worker must detect task type and conditionally inject full skill content. Manageable within existing `buildAgentPrompt()` pattern.
+
+**Files:** `src/lib/skill_encodings.js`, `src/lib/memory.js`
+
+---
+
+## D-029: Message Classification Replaces Action-Tag Parsing
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Frasier's response was parsed for action tags (`[ACTION:PROPOSAL]`, `[ACTION:NEW_PROJECT]`, `[PHASES]`) using fragile regex. The LLM had to simultaneously converse AND embed machine-readable tags. Tags were frequently malformed, missed, or hallucinated.
+
+**Decision:** Separate classification from conversation. A dedicated T1 LLM call classifies the Discord message (`casual`/`simple_task`/`full_project`) before Frasier responds. Classification drives routing; Frasier focuses on conversation. Default to `simple_task` when confidence < 0.7.
+
+**Rationale:** Single-responsibility principle. Classification is cheap (T1, ~$0.001). Frasier's prompt is simpler without action-tag instructions (~400 fewer tokens for casual messages). `simple_task` routes to the exact same proposal pipeline — zero breakage for existing flows.
+
+**Trade-offs:** Extra T1 LLM call per Discord message. Acceptable — classification is the gateway to all subsequent work.
+
+**Files:** `src/discord_bot.js`, `sql/006_task_decomposition.sql`
+
+---
+
+## D-030: Frasier as Sole Decomposer — No Plan Approval Gate
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** When Dhroov sends a full-project directive ("build me a real estate AI agent"), someone needs to break it into tasks, assign agents, and manage dependencies. Two options: (A) Frasier proposes a plan, waits for Dhroov's approval, then executes. (B) Frasier decomposes and executes autonomously — Dhroov sees progress in Linear.
+
+**Decision:** Option B — full autonomy. Frasier decomposes via T2 LLM call, validates the dependency graph, hires agents if needed, creates all steps, and begins execution immediately. Dhroov tracks progress in Linear. Escalation to founder only for: budget decisions, strategic ambiguity, brand/reputation risk, or capability gaps that can't be hired for.
+
+**Rationale:** Dhroov explicitly wants autonomous operation (D-018, D-012). A plan-approval gate defeats the purpose — it's just a more elaborate version of manual phase triggering. Linear provides full visibility without blocking execution.
+
+**Trade-offs:** If Frasier misinterprets the directive, work is wasted before Dhroov notices. Mitigated by escalation logic for genuine ambiguity, and Linear visibility for early course-correction.
+
+**Files:** `src/lib/decomposition.js`
+
+---
+
+## D-031: DAG Dependencies Over Step-Order Chains
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Step execution was controlled by `step_order` — a linear chain where step N+1 couldn't start until step N completed. This meant all tasks within a mission ran sequentially, even when they had no actual dependency (e.g., two independent research tasks).
+
+**Decision:** `step_dependencies` table tracks explicit dependencies between steps. `areAllDependenciesMet()` returns tri-state: `true` (all deps satisfied), `false` (blocked), `null` (no deps exist — use legacy step_order). Worker claims up to 3 eligible steps per tick, executes sequentially to stay within 1GB RAM.
+
+**Rationale:** Real projects have diamond dependencies, parallel workstreams, and fan-in patterns that a linear chain can't express. DAG + parallel_group gives Frasier the vocabulary to decompose projects realistically. Tri-state return preserves backward compatibility for all existing missions.
+
+**Trade-offs:** More complex eligibility checking. Extra DB queries per step (check deps table). Sequential execution within a tick means "parallelism" is tick-level, not true concurrency — acceptable given 1GB RAM constraint.
+
+**Files:** `src/lib/missions.js`, `src/worker.js`, `sql/006_task_decomposition.sql`
+
+---
+
+## D-032: Calibrated Self-Critique — "3.0 Is GOOD"
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** The original self-critique scored on a generic 1-5 scale with no anchors. LLMs defaulted to scoring everything 4/5 ("above average") because they're trained to be positive. A 4/5 score on mediocre work meant revision never triggered, and the quality gate was effectively disabled.
+
+**Decision:** 4-dimension rubric (depth, accuracy, actionability, completeness) with concrete anchors at each level. Explicit calibration: "3.0 is GOOD work. 4.0 is EXCELLENT. 5.0 is rare." Revision triggers on ANY dimension < 3.0 or average < 3.5 (was: overall < 3.0). Max 2 revision attempts (was: 1). Citation score from research phase injected into accuracy context.
+
+**Rationale:** LLMs need explicit scoring calibration or they default to inflated scores. Dimension-level scoring prevents a high score in one area from hiding a critical gap in another. "Be BRUTALLY HONEST" instruction counters the LLM's tendency toward politeness.
+
+**Trade-offs:** Stricter criteria may increase revision rate and LLM cost. Mitigated by max 2 attempts and the "proceed with what's available" fallback.
+
+**Files:** `src/lib/pipeline.js`
+
+---
+
+## D-033: QA Agents Are SMEs in Quality, Not Domain
+
+**Date:** Feb 23, 2026 | **Status:** Active | **Author:** Frasier (per Zero's directive)
+
+**Context:** Ein (QA) reviewed all deliverables with the same full-scope rubric. This meant Ein was judging whether Edward's market research showed "genuine domain expertise" — but Ein is a QA specialist, not a research expert. When QA rejects domain work for "insufficient depth," the feedback is uninformed.
+
+**Decision:** When QA reviews non-engineering domain work, scope is limited to technical quality only: structure, professionalism, citation accuracy, acceptance criteria. Domain expertise judgment is left to the assigned SME agent (self-assessment) and domain expert reviewers. Engineering tasks: Ein gets full scope (QA IS the domain expert for code quality).
+
+**Rationale:** Zero's directive: "Agents are SMEs — QA doesn't judge domain expertise, only technical quality." Each agent is hired for their domain — the QA agent's value is in catching technical/structural issues, not second-guessing domain conclusions.
+
+**Trade-offs:** Reduces QA's ability to catch domain errors in non-engineering work. Mitigated by calibrated self-critique (D-032) and domain expert review routing (D-015).
+
+**Files:** `src/lib/conversations.js`

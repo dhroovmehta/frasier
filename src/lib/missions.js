@@ -341,17 +341,27 @@ async function getPendingSteps(limit = 5) {
 
   if (!data || data.length === 0) return [];
 
-  // Post-fetch blocking check for chained steps
+  // Post-fetch blocking check: DAG path (v0.9.0) or legacy step_order path
   const eligible = [];
   for (const step of data) {
-    // step_order <= 1 always eligible (backwards compatible with existing single-step missions)
-    if (!step.step_order || step.step_order <= 1) {
+    // Check DAG dependencies first (v0.9.0 decomposed missions)
+    const dagResult = await areAllDependenciesMet(step.id);
+
+    if (dagResult === true) {
+      // DAG path: all deps met → eligible
       eligible.push(step);
+    } else if (dagResult === false) {
+      // DAG path: some deps not met → blocked
+      continue;
     } else {
-      // Chained step — only eligible if all predecessors are completed
-      const ready = await isPreviousStepComplete(step.mission_id, step.step_order);
-      if (ready) {
+      // Legacy path (no DAG deps) — fall back to step_order check
+      if (!step.step_order || step.step_order <= 1) {
         eligible.push(step);
+      } else {
+        const ready = await isPreviousStepComplete(step.mission_id, step.step_order);
+        if (ready) {
+          eligible.push(step);
+        }
       }
     }
 
@@ -723,6 +733,93 @@ async function getParentStepResult(parentStepId) {
 }
 
 // ============================================================
+// DAG DEPENDENCY CHECKING (v0.9.0)
+// ============================================================
+
+/**
+ * Check if all DAG dependencies for a step are satisfied.
+ * Returns a tri-state:
+ *   - true: all dependencies are completed → step is eligible
+ *   - false: some dependencies are not completed → step is blocked
+ *   - null: no DAG dependencies exist → caller should use legacy step_order check
+ *
+ * WHY tri-state: backward compatibility. Old missions use step_order chains.
+ * New decomposed missions use step_dependencies rows. The null return lets
+ * getPendingSteps know which path to take without a second query.
+ */
+async function areAllDependenciesMet(stepId) {
+  const { data: deps, error } = await supabase
+    .from('step_dependencies')
+    .select('depends_on_step_id')
+    .eq('step_id', stepId);
+
+  if (error) {
+    console.error(`[missions] Error checking DAG deps for step #${stepId}: ${error.message}`);
+    return false; // Block on error — safer than running out of order
+  }
+
+  // No DAG dependencies → use legacy path
+  if (!deps || deps.length === 0) return null;
+
+  // Check each dependency
+  for (const dep of deps) {
+    const { data: depStep, error: stepErr } = await supabase
+      .from('mission_steps')
+      .select('status')
+      .eq('id', dep.depends_on_step_id)
+      .single();
+
+    if (stepErr || !depStep || depStep.status !== 'completed') {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Get completed outputs from all predecessor steps (via step_dependencies).
+ * Replaces getParentStepResult() for DAG-based steps that may have multiple
+ * upstream dependencies instead of a single parent.
+ *
+ * @param {number} stepId - The step to get predecessor outputs for
+ * @returns {Array<{ agentName: string, result: string }>}
+ */
+async function getPredecessorOutputs(stepId) {
+  const { data: deps, error } = await supabase
+    .from('step_dependencies')
+    .select('depends_on_step_id')
+    .eq('step_id', stepId);
+
+  if (error || !deps || deps.length === 0) return [];
+
+  const outputs = [];
+  for (const dep of deps) {
+    const { data: depStep } = await supabase
+      .from('mission_steps')
+      .select('result, assigned_agent_id')
+      .eq('id', dep.depends_on_step_id)
+      .single();
+
+    if (!depStep || !depStep.result) continue;
+
+    // Get agent display name for context header
+    const { data: agent } = await supabase
+      .from('agents')
+      .select('display_name')
+      .eq('id', depStep.assigned_agent_id)
+      .single();
+
+    outputs.push({
+      agentName: agent?.display_name || depStep.assigned_agent_id,
+      result: depStep.result.substring(0, 6000) // RAM safety: 6KB per predecessor
+    });
+  }
+
+  return outputs;
+}
+
+// ============================================================
 // SMART ROUTING (keyword-based agent assignment)
 // ============================================================
 
@@ -815,6 +912,9 @@ module.exports = {
   parsePhases,
   isPreviousStepComplete,
   getParentStepResult,
+  // DAG dependency checking (v0.9.0)
+  areAllDependenciesMet,
+  getPredecessorOutputs,
   EXPERTISE_MAP,
   ROLE_TITLES,
   ROLE_KEYWORDS

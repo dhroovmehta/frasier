@@ -255,8 +255,13 @@ async function getTeamConversations(teamId, limit = 20) {
  * @param {string|null} originalMessage - Zero's original request (optional)
  * @returns {string} Structured review prompt
  */
-function buildEnhancedReviewPrompt(authorAgentName, deliverable, taskDescription, originalMessage = null) {
+function buildEnhancedReviewPrompt(authorAgentName, deliverable, taskDescription, originalMessage = null, options = {}) {
   const parts = [];
+  const { reviewerRole, taskRole } = options;
+
+  // QA scope adjustment (v0.9.0): When QA reviews domain work (non-engineering),
+  // limit scope to technical quality only. QA agents are SMEs in quality, not domain.
+  const isQaScopeLimited = reviewerRole === 'qa' && taskRole && taskRole !== 'engineering';
 
   if (originalMessage) {
     parts.push(`## ZERO'S ORIGINAL REQUEST
@@ -270,8 +275,19 @@ ${taskDescription}
 ## DELIVERABLE FROM ${authorAgentName}
 ${deliverable}
 
-## REVIEW INSTRUCTIONS
-Score this deliverable on 5 criteria, each 1-5:
+## REVIEW INSTRUCTIONS`);
+
+  if (isQaScopeLimited) {
+    parts.push(`
+**SCOPE LIMITATION**: Evaluate technical quality, completeness, and citation accuracy ONLY. Do not judge domain expertise — the assigned agent is the subject matter expert for this work type. Focus on:
+- Is the output well-structured and professional?
+- Are all claims cited with sources?
+- Is the acceptance criteria met?
+- Are there any factual inconsistencies or hallucinations?
+`);
+  }
+
+  parts.push(`Score this deliverable on 5 criteria, each 1-5:
 
 **Relevance** (1-5): Does it directly address what was asked? Does it answer the actual question/task?
 **Depth** (1-5): Does it show genuine domain expertise? Specific data, named sources, quantified claims — not surface-level generalities?
