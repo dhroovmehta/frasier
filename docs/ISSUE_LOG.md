@@ -4,6 +4,20 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-015: Decomposition engine never called from runtime (built but not wired)
+
+**Date:** Feb 24, 2026 | **Severity:** High | **Status:** Fixed (v0.9.2)
+
+**Symptom:** `decomposeProject()` was fully built and tested (v0.9.0) but the `[ACTION:NEW_PROJECT]` handler in discord_bot.js still created a simple proposal → heartbeat picks up → one step per phase → sequential execution. No DAG, no parallel tasks, no Linear project sync for new projects.
+
+**Root Cause:** Scope management during v0.9.0 build. The decomposition engine was built bottom-up (engine → tests → helpers), but the top-level wiring (discord_bot calls decomposition) was never connected. The build moved on to skill encoding and Linear sync before completing the integration.
+
+**Fix:** Added `handleNewProjectDecomposition()` to `decomposition.js` — creates mission directly, links to project, calls `decomposeProject()`. Wired into `[ACTION:NEW_PROJECT]` handler in discord_bot.js with fallback to proposal on failure. Also made `syncMissionToLinear` idempotent to prevent double Linear projects (D-036).
+
+**Files:** `src/lib/decomposition.js`, `src/discord_bot.js`, `src/lib/linear.js`
+
+---
+
 ## ISS-014: Infinite review loop — Mission #75 stuck in reject/revise cycle
 
 **Date:** Feb 24, 2026 | **Severity:** High | **Status:** Fixed (v0.9.1)

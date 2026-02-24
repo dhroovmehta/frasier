@@ -4,6 +4,24 @@ All architectural and design decisions, with context and trade-offs.
 
 ---
 
+## D-036: Wire Decomposition Into Runtime (Direct Mission, No Proposal)
+
+**Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** `decomposeProject()` was built and tested in v0.9.0 but never called from any runtime code path. The `[ACTION:NEW_PROJECT]` handler in discord_bot.js created a simple proposal for heartbeat to pick up → one step per lifecycle phase → sequential execution. The decomposition engine (DAG, parallel groups, dependency tracking, Linear sync) sat unused.
+
+**Decision:** Wire decomposition into `[ACTION:NEW_PROJECT]` by creating a mission directly (bypassing the proposal→heartbeat→accept flow), linking it to the project, then calling `decomposeProject()` which creates steps + dependencies + Linear sync. Added `handleNewProjectDecomposition()` to `decomposition.js` as the orchestration function.
+
+**Key design choices:**
+- **Direct mission creation** (not proposal): Decomposed projects don't need heartbeat arbitration. Frasier already classified the message as `full_project` and the LLM responded with `[ACTION:NEW_PROJECT]`. Creating the mission immediately saves one heartbeat cycle (~30s).
+- **Team defaults to `team-research`**: The mission-level teamId is for organizational grouping. Per-step agent assignment handles actual routing via `findBestAgentAcrossTeams`.
+- **Fallback to proposal on failure**: If decomposition fails (LLM error, JSON parse failure, Supabase error), fall back to the old proposal-based flow. Never block project creation on decomposition failure.
+- **`syncMissionToLinear` made idempotent**: Both `createMission()` and `decomposeProject()` call `syncMissionToLinear`. Added a check for existing `linear_sync` record to prevent duplicate Linear projects.
+
+**Trade-offs:** Bypassing proposals means decomposed projects skip heartbeat's team validation and gap detection. Acceptable because `decomposeProject()` handles its own gap detection + hiring. The heartbeat still handles phase progression for subsequent lifecycle phases.
+
+---
+
 ## D-035: 3-Strike Revision Cap
 
 **Date:** Feb 24, 2026 | **Status:** Active | **Author:** Zero + Frasier

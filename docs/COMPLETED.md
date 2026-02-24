@@ -1,6 +1,29 @@
 # Frasier — Completed Features
 
-> Last updated: Feb 23, 2026 (v0.9.0)
+> Last updated: Feb 24, 2026 (v0.9.2)
+
+---
+
+## Decomposition Wiring (v0.9.2)
+
+### Runtime Decomposition
+- **File:** `src/lib/decomposition.js` — `handleNewProjectDecomposition()`
+- Orchestrates: create mission → link to project → decompose into DAG → return result
+- Called from `discord_bot.js` `[ACTION:NEW_PROJECT]` handler
+- Bypasses proposal→heartbeat→accept flow (saves ~30s per project)
+- Fallback: if decomposition fails, creates a simple proposal (old behavior)
+- Discord response shows task count and parallel groups
+
+### Linear Idempotent Sync
+- **File:** `src/lib/linear.js` — `syncMissionToLinear()`
+- Checks `linear_sync` for existing records before creating a Linear project
+- Prevents duplicate projects when both `createMission()` and `decomposeProject()` call sync
+
+---
+
+## Linear Status Sync + Revision Cap (v0.9.1)
+
+See CHANGELOG.md for full details.
 
 ---
 

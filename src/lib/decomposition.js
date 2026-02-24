@@ -1,4 +1,4 @@
-// decomposition.js — Task Decomposition Engine (v0.9.0)
+// decomposition.js — Task Decomposition Engine (v0.9.2)
 // WHY: Frasier breaks full-project directives into parallel/sequential task DAGs.
 // A single directive becomes a structured plan with dependency management,
 // proactive hiring, and escalation handling — enabling autonomous execution.
@@ -8,6 +8,7 @@ const models = require('./models');
 const agents = require('./agents');
 const approachMemory = require('./approach_memory');
 const missions = require('./missions');
+const projects = require('./projects');
 const linear = require('./linear');
 const events = require('./events');
 
@@ -324,8 +325,66 @@ function determineEscalationType(reason) {
   return 'ambiguity';
 }
 
+// ============================================================
+// HANDLE NEW PROJECT DECOMPOSITION
+// ============================================================
+
+/**
+ * Orchestrate the full decomposition flow for a new project.
+ * Called from discord_bot's [ACTION:NEW_PROJECT] handler.
+ *
+ * WHY this exists: decomposeProject() needs a mission to already exist
+ * (it creates steps on it). This function bridges project creation
+ * and decomposition by: creating mission → linking to project → decomposing.
+ *
+ * Returns { success, missionId, taskCount, parallelGroups, plan, error, escalated }
+ */
+async function handleNewProjectDecomposition({ projectId, projectName, content, frasierAgentId }) {
+  // 1. Create mission directly — bypass the proposal→heartbeat→accept flow
+  // WHY: Decomposed projects don't need heartbeat arbitration. Frasier already
+  // decided this is a full project. Creating the mission immediately lets us
+  // attach decomposed steps right away instead of waiting for the next heartbeat cycle.
+  const mission = await missions.createMission({
+    title: `[PROJECT:${projectId}] ${projectName}`,
+    description: content,
+    teamId: 'team-research'
+  });
+
+  if (!mission) {
+    return { success: false, error: 'Mission creation failed' };
+  }
+
+  // 2. Link mission to project via join table (discovery phase)
+  await projects.linkMissionToProject(projectId, mission.id, 'discovery');
+
+  // 3. Decompose — LLM breaks directive into a DAG of parallel/sequential tasks
+  const result = await decomposeProject({
+    projectId,
+    missionId: mission.id,
+    directive: content,
+    frasierAgentId
+  });
+
+  if (result.error) {
+    return { success: false, missionId: mission.id, error: result.error };
+  }
+
+  if (result.escalated) {
+    return { success: true, escalated: true, missionId: mission.id, plan: result.plan };
+  }
+
+  return {
+    success: true,
+    missionId: mission.id,
+    taskCount: result.plan.tasks.length,
+    parallelGroups: [...new Set(result.plan.tasks.map(t => t.parallel_group))].length,
+    plan: result.plan
+  };
+}
+
 module.exports = {
   decomposeProject,
+  handleNewProjectDecomposition,
   validateDependencyGraph,
   createStepsFromPlan
 };

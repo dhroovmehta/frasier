@@ -140,6 +140,22 @@ async function syncMissionToLinear(mission) {
   if (!process.env.LINEAR_API_KEY) return null;
 
   try {
+    // Idempotency: check if a Linear project already exists for this mission.
+    // WHY: createMission() and decomposeProject() both call syncMissionToLinear.
+    // Without this check, two Linear projects would be created for one mission.
+    const { data: existingSync } = await supabase
+      .from('linear_sync')
+      .select('entity_id, entity_url')
+      .eq('mission_id', mission.id)
+      .eq('sync_type', 'mission_to_project')
+      .limit(1)
+      .maybeSingle();
+
+    if (existingSync) {
+      console.log(`[linear] Mission #${mission.id} already synced → skipping duplicate project creation`);
+      return { id: existingSync.entity_id, url: existingSync.entity_url };
+    }
+
     const polished = await polishTitleAndDescription(
       `${mission.title || ''}\n${mission.description || ''}`.trim()
     );

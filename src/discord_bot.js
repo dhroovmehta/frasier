@@ -29,6 +29,7 @@ const web = require('./lib/web');
 const projects = require('./lib/projects');
 const content = require('./lib/content');
 const linear = require('./lib/linear');
+const decomposition = require('./lib/decomposition');
 
 // ============================================================
 // DISCORD CLIENT SETUP
@@ -373,24 +374,49 @@ DEFAULT TO [ACTION:PROPOSAL] for single-step tasks, [ACTION:MULTI_STEP_PROPOSAL]
           }
         }
 
-        // Create first proposal for discovery phase
-        await missions.createProposal({
-          proposingAgentId: 'zero',
-          title: `[PROJECT:${project.id}] Discovery: ${projectName}`,
-          description: `[PROJECT:${project.id}] ${content}`,
-          priority: 'normal',
-          rawMessage: content
+        // Decompose project into a DAG of parallel/sequential tasks.
+        // WHY: Instead of creating a single proposal for heartbeat to pick up,
+        // we create a mission directly and decompose it into an intelligent
+        // task graph. This enables parallel execution and Linear project sync.
+        const decompResult = await decomposition.handleNewProjectDecomposition({
+          projectId: project.id,
+          projectName,
+          content,
+          frasierAgentId: frasierAgent.id
         });
+
+        // Fallback: if decomposition failed, create a simple proposal instead.
+        // Never block project creation on decomposition failure.
+        if (!decompResult.success) {
+          console.log(`[discord] Decomposition failed for project #${project.id}, falling back to proposal: ${decompResult.error}`);
+          await missions.createProposal({
+            proposingAgentId: 'zero',
+            title: `[PROJECT:${project.id}] Discovery: ${projectName}`,
+            description: `[PROJECT:${project.id}] ${content}`,
+            priority: 'normal',
+            rawMessage: content
+          });
+        }
 
         const statusLines = roleStatus.length > 0
           ? '\n' + roleStatus.map(s => `  - ${s}`).join('\n')
           : '';
 
+        // Build Discord response based on decomposition result
+        let projectStatus;
+        if (decompResult.success && decompResult.escalated) {
+          projectStatus = '\n*Escalation required — Frasier flagged this for founder review.*';
+        } else if (decompResult.success) {
+          projectStatus = `\n*Decomposed into ${decompResult.taskCount} tasks across ${decompResult.parallelGroups} parallel group(s). Execution starting now.*`;
+        } else {
+          projectStatus = '\n*Discovery phase mission created. Team will start shortly.*';
+        }
+
         await sendSplit(message.channel,
           cleanResponse +
           `\n\n*Project "${projectName}" created (ID: #${project.id}). Lifecycle tracking active.*` +
           (statusLines ? `\n*Team:${statusLines}*` : '') +
-          '\n*Discovery phase mission created. Team will start shortly.*'
+          projectStatus
         );
       } else {
         await sendSplit(message.channel, cleanResponse + '\n\n*Failed to create project. Mission proposal created as fallback.*');

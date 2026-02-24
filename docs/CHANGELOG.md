@@ -4,6 +4,45 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.9.2] — 2026-02-24 (Decomposition Wiring)
+
+### Added
+- **`handleNewProjectDecomposition()` in `decomposition.js`:** Orchestrates the full decomposition flow for new projects — creates mission directly, links to project, decomposes into DAG, returns result for Discord response. Called from `[ACTION:NEW_PROJECT]` handler.
+- **Decomposition wiring in `discord_bot.js`:** The `[ACTION:NEW_PROJECT]` handler now calls `handleNewProjectDecomposition()` instead of creating a simple proposal. Projects are intelligently decomposed into parallel/sequential task DAGs with full Linear sync.
+- **Fallback to proposal:** If decomposition fails (LLM error, validation failure), the handler falls back to creating a discovery-phase proposal (old behavior). Project creation is never blocked by decomposition failure.
+- **`syncMissionToLinear` idempotency:** Checks `linear_sync` for existing records before creating a Linear project. Prevents duplicate projects when both `createMission()` and `decomposeProject()` call `syncMissionToLinear`.
+- **TDD Tests:** 12 new tests — 11 in `tests/v09/decomposition-wiring.test.js` + 1 idempotency test in `tests/linear/linear.test.js`.
+
+### Modified
+- **`src/lib/decomposition.js`:** Added `handleNewProjectDecomposition()` export, added `projects` import.
+- **`src/discord_bot.js`:** `[ACTION:NEW_PROJECT]` handler rewired from proposal → decomposition. Added `decomposition` import. Discord messages now show task count and parallel groups.
+- **`src/lib/linear.js`:** `syncMissionToLinear()` checks for existing sync record before creating Linear project (idempotent).
+
+### Data Flow Change
+**Before (v0.9.1):**
+```
+Discord → classifyMessage → full_project → Frasier response → createProposal
+→ [wait for heartbeat] → acceptProposal → createMission → 1 step → worker
+```
+
+**After (v0.9.2):**
+```
+Discord → classifyMessage → full_project → Frasier response → createMission
+→ linkMissionToProject → decomposeProject → N steps with DAG → worker
+→ Linear project + issues + dependency relations (all immediate)
+```
+
+### Cost Impact
+- One additional T2 (Sonnet) LLM call per new project for decomposition (~$0.03)
+- Linear API calls: 1 project + N issues + dependency relations per project
+
+### Notes
+- All 406 tests pass (394 existing + 12 new, zero regressions).
+- No SQL migration needed — uses existing tables.
+- Decision: D-036.
+
+---
+
 ## [0.9.1] — 2026-02-24 (Linear Status Sync + Revision Cap)
 
 ### Fixed

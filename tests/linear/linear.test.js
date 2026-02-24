@@ -229,6 +229,34 @@ describe('syncMissionToLinear()', () => {
     expect(result).toBeNull();
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  test('skips creation when linear_sync record already exists for this mission (idempotent)', async () => {
+    // WHY: createMission() and decomposeProject() both call syncMissionToLinear.
+    // Without idempotency, two Linear projects would be created for one mission.
+    const mission = makeMission({ id: 42, title: 'Test Mission' });
+
+    // Pre-populate: a sync record already exists (e.g. from createMission)
+    mockSupabase.__setData('linear_sync', [{
+      id: 1,
+      entity_type: 'project',
+      entity_id: 'proj-existing',
+      entity_url: 'https://linear.app/frasier/project/existing',
+      mission_id: 42,
+      sync_type: 'mission_to_project',
+      status: 'synced'
+    }]);
+
+    const result = await linear.syncMissionToLinear(mission);
+
+    // Should return the existing project info, NOT create a new one
+    expect(result).not.toBeNull();
+    expect(result.id).toBe('proj-existing');
+    // Should NOT have called the GraphQL API (no project creation)
+    expect(mockFetch).not.toHaveBeenCalled();
+    // Should NOT have created a new sync record
+    const syncRows = mockSupabase.__getData('linear_sync');
+    expect(syncRows).toHaveLength(1); // Still just the original
+  });
 });
 
 // ============================================================
