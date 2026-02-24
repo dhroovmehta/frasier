@@ -150,7 +150,7 @@ Categories:
 
 Respond with ONLY JSON (no markdown, no explanation):
 {"classification": "casual|simple_task|full_project", "confidence": 0.0-1.0, "reasoning": "brief explanation"}`,
-      agentId: 'frasier',
+      agentId: null,  // WHY: 'frasier' is not in agents table → FK violation in model_usage
       forceTier: 'tier1'
     });
 

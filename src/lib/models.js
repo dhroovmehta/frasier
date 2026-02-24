@@ -409,10 +409,11 @@ async function logModelUsage({
   errorMessage = null,
   metadata = {}
 }) {
-  // WHY: model_usage.agent_id has a FK to agents(id). Internal calls use
-  // agentId='system' which doesn't exist in agents table → constraint violation.
-  // Sanitize to null for non-agent callers (ISS-017).
-  const sanitizedAgentId = (agentId && agentId !== 'system') ? agentId : null;
+  // WHY: model_usage.agent_id has a FK to agents(id). Internal callers pass
+  // non-agent strings ('system', 'frasier') which don't exist in the agents table
+  // → FK constraint violation. Only keep IDs that match the agent-* naming convention
+  // used by autoHireGapAgent and seed data. Everything else → null. (ISS-020, ISS-021)
+  const sanitizedAgentId = (agentId && agentId.startsWith('agent-')) ? agentId : null;
 
   const { error } = await supabase
     .from('model_usage')

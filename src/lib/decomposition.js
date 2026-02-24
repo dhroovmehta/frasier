@@ -165,7 +165,7 @@ async function decomposeProject({ projectId, missionId, directive, frasierAgentI
     // 12. Save approach memory for future decompositions
     await approachMemory.save({
       agentId: frasierAgentId,
-      missionStepId: 0,
+      missionStepId: null,  // WHY: Decomposition-level memory isn't tied to a specific step. 0 triggers FK violation.
       taskSummary: directive,
       topicTags,
       decomposition: { taskCount: plan.tasks.length, parallelGroups },
@@ -244,12 +244,14 @@ async function createStepsFromPlan(missionId, plan, agentMap) {
   for (const task of plan.tasks) {
     const description = `${task.description}\n\nAcceptance Criteria: ${task.acceptance_criteria}`;
 
+    // WHY camelCase: createStep() destructures {missionId, assignedAgentId, modelTier, stepOrder}.
+    // Snake_case keys silently become undefined in JS destructuring → steps created with null fields.
     const step = await missions.createStep({
-      mission_id: missionId,
+      missionId,
       description,
-      assigned_agent_id: agentMap[task.required_role] || null,
-      model_tier: 'tier2',
-      step_order: task.parallel_group
+      assignedAgentId: agentMap[task.required_role] || null,
+      modelTier: 'tier2',
+      stepOrder: task.parallel_group
     });
 
     taskIdToStepId[task.id] = step.id;

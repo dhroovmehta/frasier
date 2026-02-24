@@ -270,8 +270,8 @@ describe('createStepsFromPlan', () => {
     // T1 and T2 are parallel_group 1, T3 and T4 are parallel_group 2
     const call1 = mockCreateStep.mock.calls[0][0];
     const call3 = mockCreateStep.mock.calls[2][0];
-    expect(call1.step_order).toBe(1);
-    expect(call3.step_order).toBe(2);
+    expect(call1.stepOrder).toBe(1);
+    expect(call3.stepOrder).toBe(2);
   });
 
   it('creates step_dependencies rows from depends_on references', async () => {
@@ -301,11 +301,11 @@ describe('createStepsFromPlan', () => {
     await decomposition.createStepsFromPlan(10, plan, agentMap);
 
     // T1 (research) → edward
-    expect(mockCreateStep.mock.calls[0][0].assigned_agent_id).toBe('edward');
+    expect(mockCreateStep.mock.calls[0][0].assignedAgentId).toBe('edward');
     // T3 (engineering) → spike
-    expect(mockCreateStep.mock.calls[2][0].assigned_agent_id).toBe('spike');
+    expect(mockCreateStep.mock.calls[2][0].assignedAgentId).toBe('spike');
     // T4 (strategy) → jet
-    expect(mockCreateStep.mock.calls[3][0].assigned_agent_id).toBe('jet');
+    expect(mockCreateStep.mock.calls[3][0].assignedAgentId).toBe('jet');
   });
 
   it('includes acceptance_criteria in step description', async () => {

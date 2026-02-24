@@ -1028,8 +1028,17 @@ async function ensureInitialized() {
   console.log('[linear] Auto-initializing (lazy init from worker/other process)...');
   await ensureWorkflowStatesExist();
   await ensureLabelsExist();
-  initialized = true;
-  console.log('[linear] Lazy init complete');
+
+  // WHY: Only set initialized=true when cache is actually populated. If the API
+  // calls silently failed (returned null), the cache is empty and all subsequent
+  // updateIssueStatus() calls will fail with "Unknown workflow state". By checking
+  // cache before setting the flag, we allow retry on the next call. (ISS-021)
+  if (cache?.workflowStates && Object.keys(cache.workflowStates).length > 0) {
+    initialized = true;
+    console.log('[linear] Lazy init complete');
+  } else {
+    console.error('[linear] Lazy init failed — workflow states cache empty, will retry next call');
+  }
 }
 
 /**
