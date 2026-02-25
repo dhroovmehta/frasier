@@ -30,24 +30,24 @@
     "updated_at": "2026-02-16T22:13:43.326952+00:00"
   },
   {
-    "id": 33,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "general_task_execution",
-    "proficiency": 1,
-    "usage_count": 4,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-17T14:12:13.322083+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
+    "id": 71,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "security_auditing",
+    "proficiency": 4,
+    "usage_count": 22,
+    "last_used_at": "2026-02-25T03:37:01.813+00:00",
+    "created_at": "2026-02-18T01:30:24.813043+00:00",
+    "updated_at": "2026-02-25T03:37:02.292+00:00"
   },
   {
-    "id": 6,
-    "agent_id": "agent-sahaquiel-1770840215198",
+    "id": 48,
+    "agent_id": "agent-toji-1770840215950",
     "skill_name": "business_modeling",
-    "proficiency": 3,
-    "usage_count": 13,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-12T18:09:37.678665+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
+    "proficiency": 1,
+    "usage_count": 2,
+    "last_used_at": "2026-02-24T22:14:10.459+00:00",
+    "created_at": "2026-02-18T00:59:51.555942+00:00",
+    "updated_at": "2026-02-24T22:14:10.459+00:00"
   },
   {
     "id": 12,
@@ -60,54 +60,44 @@
     "updated_at": "2026-02-23T17:14:22.202+00:00"
   },
   {
-    "id": 4,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "data_analysis",
-    "proficiency": 1,
-    "usage_count": 4,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-12T18:09:37.110235+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
-  },
-  {
     "id": 3,
     "agent_id": "agent-sahaquiel-1770840215198",
     "skill_name": "market_research",
-    "proficiency": 2,
-    "usage_count": 7,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
+    "proficiency": 5,
+    "usage_count": 41,
+    "last_used_at": "2026-02-25T03:36:01.9+00:00",
     "created_at": "2026-02-12T18:09:36.839189+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
+    "updated_at": "2026-02-25T03:36:01.9+00:00"
   },
   {
-    "id": 2,
-    "agent_id": "agent-gendo-1770840214305",
-    "skill_name": "security_auditing",
-    "proficiency": 4,
-    "usage_count": 34,
-    "last_used_at": "2026-02-23T19:28:20.18+00:00",
-    "created_at": "2026-02-12T02:00:49.328992+00:00",
-    "updated_at": "2026-02-23T19:28:20.18+00:00"
-  },
-  {
-    "id": 11,
+    "id": 59,
     "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "system_architecture",
-    "proficiency": 1,
-    "usage_count": 3,
-    "last_used_at": "2026-02-23T18:20:48.814+00:00",
-    "created_at": "2026-02-13T22:11:12.430839+00:00",
-    "updated_at": "2026-02-23T18:20:48.814+00:00"
+    "skill_name": "security_auditing",
+    "proficiency": 3,
+    "usage_count": 20,
+    "last_used_at": "2026-02-24T23:48:56.085+00:00",
+    "created_at": "2026-02-18T01:03:16.700481+00:00",
+    "updated_at": "2026-02-24T23:48:56.085+00:00"
   },
   {
     "id": 22,
     "agent_id": "agent-sahaquiel-1770840215198",
     "skill_name": "social_media",
-    "proficiency": 1,
-    "usage_count": 1,
-    "last_used_at": "2026-02-16T22:30:50.457+00:00",
+    "proficiency": 3,
+    "usage_count": 16,
+    "last_used_at": "2026-02-25T03:09:54.457+00:00",
     "created_at": "2026-02-16T22:30:52.187482+00:00",
-    "updated_at": "2026-02-16T22:30:52.187482+00:00"
+    "updated_at": "2026-02-25T03:09:54.457+00:00"
+  },
+  {
+    "id": 10,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "software_engineering",
+    "proficiency": 3,
+    "usage_count": 18,
+    "last_used_at": "2026-02-25T01:09:51.217+00:00",
+    "created_at": "2026-02-13T22:11:11.566892+00:00",
+    "updated_at": "2026-02-25T01:09:51.217+00:00"
   },
   {
     "id": 64,
@@ -120,14 +110,14 @@
     "updated_at": "2026-02-18T01:13:07.786+00:00"
   },
   {
-    "id": 67,
+    "id": 46,
     "agent_id": "agent-toji-1770840215950",
-    "skill_name": "quality_assurance",
+    "skill_name": "data_analysis",
     "proficiency": 2,
-    "usage_count": 10,
-    "last_used_at": "2026-02-23T19:38:29.043+00:00",
-    "created_at": "2026-02-18T01:20:44.625503+00:00",
-    "updated_at": "2026-02-23T19:38:29.043+00:00"
+    "usage_count": 9,
+    "last_used_at": "2026-02-24T17:28:34.748+00:00",
+    "created_at": "2026-02-18T00:59:51.11586+00:00",
+    "updated_at": "2026-02-24T17:28:34.748+00:00"
   },
   {
     "id": 63,
@@ -138,16 +128,6 @@
     "last_used_at": "2026-02-18T01:26:39.145+00:00",
     "created_at": "2026-02-18T01:08:43.725282+00:00",
     "updated_at": "2026-02-18T01:26:39.145+00:00"
-  },
-  {
-    "id": 24,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "campaign_management",
-    "proficiency": 1,
-    "usage_count": 1,
-    "last_used_at": "2026-02-16T22:30:50.457+00:00",
-    "created_at": "2026-02-16T22:30:53.419519+00:00",
-    "updated_at": "2026-02-16T22:30:53.419519+00:00"
   },
   {
     "id": 25,
@@ -170,34 +150,24 @@
     "updated_at": "2026-02-17T14:20:26.607+00:00"
   },
   {
-    "id": 31,
+    "id": 23,
     "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "test_design",
-    "proficiency": 1,
-    "usage_count": 1,
-    "last_used_at": "2026-02-17T14:05:37.454+00:00",
-    "created_at": "2026-02-17T14:05:38.388014+00:00",
-    "updated_at": "2026-02-17T14:05:38.388014+00:00"
-  },
-  {
-    "id": 1,
-    "agent_id": "agent-gendo-1770840214305",
     "skill_name": "quality_assurance",
-    "proficiency": 4,
-    "usage_count": 34,
-    "last_used_at": "2026-02-23T19:28:20.18+00:00",
-    "created_at": "2026-02-12T02:00:49.070323+00:00",
-    "updated_at": "2026-02-23T19:28:20.18+00:00"
+    "proficiency": 5,
+    "usage_count": 38,
+    "last_used_at": "2026-02-25T03:14:36.762+00:00",
+    "created_at": "2026-02-16T22:30:52.915472+00:00",
+    "updated_at": "2026-02-25T03:14:36.762+00:00"
   },
   {
-    "id": 45,
+    "id": 56,
     "agent_id": "agent-toji-1770840215950",
-    "skill_name": "market_research",
-    "proficiency": 2,
-    "usage_count": 7,
-    "last_used_at": "2026-02-18T02:11:41.212+00:00",
-    "created_at": "2026-02-18T00:59:50.908311+00:00",
-    "updated_at": "2026-02-18T02:11:41.212+00:00"
+    "skill_name": "competitive_intel",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T17:28:34.748+00:00",
+    "created_at": "2026-02-18T01:02:42.2633+00:00",
+    "updated_at": "2026-02-24T17:28:34.748+00:00"
   },
   {
     "id": 26,
@@ -250,14 +220,14 @@
     "updated_at": "2026-02-16T22:13:42.260559+00:00"
   },
   {
-    "id": 27,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "information_architecture",
+    "id": 47,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "strategic_planning",
     "proficiency": 1,
     "usage_count": 3,
-    "last_used_at": "2026-02-17T14:12:10.507+00:00",
-    "created_at": "2026-02-17T01:17:18.241814+00:00",
-    "updated_at": "2026-02-17T14:12:10.507+00:00"
+    "last_used_at": "2026-02-24T22:14:10.459+00:00",
+    "created_at": "2026-02-18T00:59:51.342472+00:00",
+    "updated_at": "2026-02-24T22:14:10.459+00:00"
   },
   {
     "id": 20,
@@ -280,14 +250,14 @@
     "updated_at": "2026-02-18T01:30:21.239+00:00"
   },
   {
-    "id": 47,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "strategic_planning",
-    "proficiency": 1,
-    "usage_count": 0,
-    "last_used_at": "2026-02-18T01:34:43.13+00:00",
-    "created_at": "2026-02-18T00:59:51.342472+00:00",
-    "updated_at": "2026-02-18T01:34:43.833+00:00"
+    "id": 31,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "test_design",
+    "proficiency": 5,
+    "usage_count": 43,
+    "last_used_at": "2026-02-25T03:36:01.9+00:00",
+    "created_at": "2026-02-17T14:05:38.388014+00:00",
+    "updated_at": "2026-02-25T03:36:01.9+00:00"
   },
   {
     "id": 70,
@@ -300,44 +270,44 @@
     "updated_at": "2026-02-18T01:26:41.934306+00:00"
   },
   {
-    "id": 10,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "software_engineering",
-    "proficiency": 2,
-    "usage_count": 6,
-    "last_used_at": "2026-02-23T17:49:37.528+00:00",
-    "created_at": "2026-02-13T22:11:11.566892+00:00",
-    "updated_at": "2026-02-23T17:49:37.528+00:00"
-  },
-  {
-    "id": 28,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "documentation",
-    "proficiency": 2,
-    "usage_count": 10,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-17T01:27:39.471876+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
+    "id": 2,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "security_auditing",
+    "proficiency": 5,
+    "usage_count": 37,
+    "last_used_at": "2026-02-25T03:10:53.144+00:00",
+    "created_at": "2026-02-12T02:00:49.328992+00:00",
+    "updated_at": "2026-02-25T03:10:53.144+00:00"
   },
   {
     "id": 9,
     "agent_id": "agent-sahaquiel-1770840215198",
     "skill_name": "copywriting",
-    "proficiency": 2,
-    "usage_count": 5,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
+    "proficiency": 4,
+    "usage_count": 28,
+    "last_used_at": "2026-02-25T03:36:01.9+00:00",
     "created_at": "2026-02-13T22:11:11.312801+00:00",
-    "updated_at": "2026-02-23T19:37:49.454+00:00"
+    "updated_at": "2026-02-25T03:36:01.9+00:00"
+  },
+  {
+    "id": 57,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "test_design",
+    "proficiency": 2,
+    "usage_count": 7,
+    "last_used_at": "2026-02-24T22:14:10.459+00:00",
+    "created_at": "2026-02-18T01:02:43.180636+00:00",
+    "updated_at": "2026-02-24T22:14:10.459+00:00"
   },
   {
     "id": 32,
     "agent_id": "agent-sahaquiel-1770840215198",
     "skill_name": "brand_storytelling",
     "proficiency": 1,
-    "usage_count": 2,
-    "last_used_at": "2026-02-17T14:14:42.616+00:00",
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T18:23:42.79+00:00",
     "created_at": "2026-02-17T14:12:11.654906+00:00",
-    "updated_at": "2026-02-17T14:14:42.616+00:00"
+    "updated_at": "2026-02-24T18:23:42.79+00:00"
   },
   {
     "id": 61,
@@ -360,14 +330,14 @@
     "updated_at": "2026-02-18T02:11:41.212+00:00"
   },
   {
-    "id": 56,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "competitive_intel",
-    "proficiency": 1,
-    "usage_count": 2,
-    "last_used_at": "2026-02-18T01:20:42.61+00:00",
-    "created_at": "2026-02-18T01:02:42.2633+00:00",
-    "updated_at": "2026-02-18T01:20:42.61+00:00"
+    "id": 1,
+    "agent_id": "agent-gendo-1770840214305",
+    "skill_name": "quality_assurance",
+    "proficiency": 5,
+    "usage_count": 37,
+    "last_used_at": "2026-02-25T03:10:53.144+00:00",
+    "created_at": "2026-02-12T02:00:49.070323+00:00",
+    "updated_at": "2026-02-25T03:10:53.144+00:00"
   },
   {
     "id": 66,
@@ -378,16 +348,6 @@
     "last_used_at": "2026-02-18T01:34:43.13+00:00",
     "created_at": "2026-02-18T01:20:44.387563+00:00",
     "updated_at": "2026-02-18T01:34:43.13+00:00"
-  },
-  {
-    "id": 23,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "quality_assurance",
-    "proficiency": 3,
-    "usage_count": 15,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-16T22:30:52.915472+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
   },
   {
     "id": 54,
@@ -420,14 +380,14 @@
     "updated_at": "2026-02-23T17:16:03.502+00:00"
   },
   {
-    "id": 46,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "data_analysis",
-    "proficiency": 2,
-    "usage_count": 7,
-    "last_used_at": "2026-02-18T02:11:41.212+00:00",
-    "created_at": "2026-02-18T00:59:51.11586+00:00",
-    "updated_at": "2026-02-18T02:11:41.212+00:00"
+    "id": 5,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "strategic_planning",
+    "proficiency": 4,
+    "usage_count": 28,
+    "last_used_at": "2026-02-25T03:18:17.69+00:00",
+    "created_at": "2026-02-12T18:09:37.392278+00:00",
+    "updated_at": "2026-02-25T03:18:17.69+00:00"
   },
   {
     "id": 39,
@@ -540,34 +500,44 @@
     "updated_at": "2026-02-18T02:11:41.212+00:00"
   },
   {
-    "id": 51,
+    "id": 55,
     "agent_id": "agent-toji-1770840215950",
-    "skill_name": "software_engineering",
+    "skill_name": "documentation",
     "proficiency": 2,
-    "usage_count": 7,
-    "last_used_at": "2026-02-18T02:11:41.212+00:00",
-    "created_at": "2026-02-18T00:59:52.210581+00:00",
-    "updated_at": "2026-02-18T02:11:41.212+00:00"
+    "usage_count": 10,
+    "last_used_at": "2026-02-24T22:14:10.459+00:00",
+    "created_at": "2026-02-18T00:59:53.133993+00:00",
+    "updated_at": "2026-02-24T22:14:10.459+00:00"
   },
   {
-    "id": 71,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "security_auditing",
-    "proficiency": 2,
-    "usage_count": 8,
-    "last_used_at": "2026-02-23T19:38:29.043+00:00",
-    "created_at": "2026-02-18T01:30:24.813043+00:00",
-    "updated_at": "2026-02-23T19:38:29.043+00:00"
-  },
-  {
-    "id": 59,
+    "id": 24,
     "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "security_auditing",
-    "proficiency": 2,
-    "usage_count": 7,
-    "last_used_at": "2026-02-23T17:19:27.863+00:00",
-    "created_at": "2026-02-18T01:03:16.700481+00:00",
-    "updated_at": "2026-02-23T17:19:27.863+00:00"
+    "skill_name": "campaign_management",
+    "proficiency": 3,
+    "usage_count": 16,
+    "last_used_at": "2026-02-24T23:18:00.341+00:00",
+    "created_at": "2026-02-16T22:30:53.419519+00:00",
+    "updated_at": "2026-02-24T23:18:00.341+00:00"
+  },
+  {
+    "id": 6,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "business_modeling",
+    "proficiency": 5,
+    "usage_count": 40,
+    "last_used_at": "2026-02-25T03:09:54.457+00:00",
+    "created_at": "2026-02-12T18:09:37.678665+00:00",
+    "updated_at": "2026-02-25T03:09:54.457+00:00"
+  },
+  {
+    "id": 21,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "leadership",
+    "proficiency": 3,
+    "usage_count": 15,
+    "last_used_at": "2026-02-24T18:33:21.649+00:00",
+    "created_at": "2026-02-16T22:30:51.667184+00:00",
+    "updated_at": "2026-02-24T18:33:21.649+00:00"
   },
   {
     "id": 68,
@@ -580,24 +550,24 @@
     "updated_at": "2026-02-18T02:11:41.212+00:00"
   },
   {
-    "id": 57,
+    "id": 45,
     "agent_id": "agent-toji-1770840215950",
-    "skill_name": "test_design",
-    "proficiency": 1,
-    "usage_count": 3,
-    "last_used_at": "2026-02-18T01:24:21.743+00:00",
-    "created_at": "2026-02-18T01:02:43.180636+00:00",
-    "updated_at": "2026-02-18T01:24:21.743+00:00"
+    "skill_name": "market_research",
+    "proficiency": 2,
+    "usage_count": 10,
+    "last_used_at": "2026-02-24T17:28:34.748+00:00",
+    "created_at": "2026-02-18T00:59:50.908311+00:00",
+    "updated_at": "2026-02-24T17:28:34.748+00:00"
   },
   {
-    "id": 21,
+    "id": 7,
     "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "leadership",
-    "proficiency": 2,
-    "usage_count": 7,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-16T22:30:51.667184+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
+    "skill_name": "seo_optimization",
+    "proficiency": 6,
+    "usage_count": 55,
+    "last_used_at": "2026-02-25T03:36:01.9+00:00",
+    "created_at": "2026-02-12T18:09:37.94644+00:00",
+    "updated_at": "2026-02-25T03:36:01.9+00:00"
   },
   {
     "id": 34,
@@ -610,44 +580,74 @@
     "updated_at": "2026-02-18T01:26:39.145+00:00"
   },
   {
-    "id": 5,
+    "id": 33,
     "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "strategic_planning",
-    "proficiency": 3,
-    "usage_count": 12,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-12T18:09:37.392278+00:00",
-    "updated_at": "2026-02-23T19:37:48.441+00:00"
+    "skill_name": "general_task_execution",
+    "proficiency": 4,
+    "usage_count": 22,
+    "last_used_at": "2026-02-25T01:09:51.217+00:00",
+    "created_at": "2026-02-17T14:12:13.322083+00:00",
+    "updated_at": "2026-02-25T01:09:53.714+00:00"
   },
   {
-    "id": 48,
+    "id": 51,
     "agent_id": "agent-toji-1770840215950",
-    "skill_name": "business_modeling",
-    "proficiency": 1,
-    "usage_count": 0,
-    "last_used_at": "2026-02-18T02:11:41.212+00:00",
-    "created_at": "2026-02-18T00:59:51.555942+00:00",
-    "updated_at": "2026-02-18T02:11:41.212+00:00"
-  },
-  {
-    "id": 55,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "documentation",
+    "skill_name": "software_engineering",
     "proficiency": 2,
-    "usage_count": 6,
-    "last_used_at": "2026-02-18T01:34:43.13+00:00",
-    "created_at": "2026-02-18T00:59:53.133993+00:00",
-    "updated_at": "2026-02-18T01:34:43.13+00:00"
+    "usage_count": 8,
+    "last_used_at": "2026-02-24T17:28:34.748+00:00",
+    "created_at": "2026-02-18T00:59:52.210581+00:00",
+    "updated_at": "2026-02-24T17:28:34.748+00:00"
   },
   {
-    "id": 7,
+    "id": 28,
     "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "seo_optimization",
+    "skill_name": "documentation",
+    "proficiency": 4,
+    "usage_count": 33,
+    "last_used_at": "2026-02-25T03:09:54.457+00:00",
+    "created_at": "2026-02-17T01:27:39.471876+00:00",
+    "updated_at": "2026-02-25T03:09:54.457+00:00"
+  },
+  {
+    "id": 11,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "system_architecture",
     "proficiency": 3,
-    "usage_count": 21,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-12T18:09:37.94644+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
+    "usage_count": 15,
+    "last_used_at": "2026-02-24T18:33:21.649+00:00",
+    "created_at": "2026-02-13T22:11:12.430839+00:00",
+    "updated_at": "2026-02-24T18:33:21.649+00:00"
+  },
+  {
+    "id": 27,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "information_architecture",
+    "proficiency": 4,
+    "usage_count": 26,
+    "last_used_at": "2026-02-25T03:18:17.69+00:00",
+    "created_at": "2026-02-17T01:17:18.241814+00:00",
+    "updated_at": "2026-02-25T03:18:17.69+00:00"
+  },
+  {
+    "id": 4,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "data_analysis",
+    "proficiency": 5,
+    "usage_count": 41,
+    "last_used_at": "2026-02-25T01:49:08.189+00:00",
+    "created_at": "2026-02-12T18:09:37.110235+00:00",
+    "updated_at": "2026-02-25T01:49:08.189+00:00"
+  },
+  {
+    "id": 67,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "quality_assurance",
+    "proficiency": 4,
+    "usage_count": 25,
+    "last_used_at": "2026-02-25T03:37:01.813+00:00",
+    "created_at": "2026-02-18T01:20:44.625503+00:00",
+    "updated_at": "2026-02-25T03:37:01.813+00:00"
   },
   {
     "id": 65,
@@ -678,16 +678,6 @@
     "last_used_at": "2026-02-18T01:34:43.13+00:00",
     "created_at": "2026-02-18T00:59:52.690785+00:00",
     "updated_at": "2026-02-18T01:34:43.13+00:00"
-  },
-  {
-    "id": 72,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "seo_optimization",
-    "proficiency": 1,
-    "usage_count": 1,
-    "last_used_at": "2026-02-18T02:11:41.212+00:00",
-    "created_at": "2026-02-18T02:11:43.164333+00:00",
-    "updated_at": "2026-02-18T02:11:43.164333+00:00"
   },
   {
     "id": 13,
@@ -780,36 +770,6 @@
     "updated_at": "2026-02-23T02:16:23.490047+00:00"
   },
   {
-    "id": 85,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "competitive_intel",
-    "proficiency": 1,
-    "usage_count": 0,
-    "last_used_at": null,
-    "created_at": "2026-02-23T02:16:24.052079+00:00",
-    "updated_at": "2026-02-23T02:16:24.052079+00:00"
-  },
-  {
-    "id": 87,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "competitive_analysis",
-    "proficiency": 1,
-    "usage_count": 0,
-    "last_used_at": null,
-    "created_at": "2026-02-23T02:16:24.052079+00:00",
-    "updated_at": "2026-02-23T02:16:24.052079+00:00"
-  },
-  {
-    "id": 88,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "market_sizing",
-    "proficiency": 1,
-    "usage_count": 0,
-    "last_used_at": null,
-    "created_at": "2026-02-23T02:16:24.052079+00:00",
-    "updated_at": "2026-02-23T02:16:24.052079+00:00"
-  },
-  {
     "id": 89,
     "agent_id": "agent-sahaquiel-1770840215198",
     "skill_name": "data_storytelling",
@@ -833,16 +793,6 @@
     "id": 91,
     "agent_id": "agent-sahaquiel-1770840215198",
     "skill_name": "analytics_design",
-    "proficiency": 1,
-    "usage_count": 0,
-    "last_used_at": null,
-    "created_at": "2026-02-23T02:16:24.052079+00:00",
-    "updated_at": "2026-02-23T02:16:24.052079+00:00"
-  },
-  {
-    "id": 92,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "research_methodology",
     "proficiency": 1,
     "usage_count": 0,
     "last_used_at": null,
@@ -970,16 +920,6 @@
     "updated_at": "2026-02-18T02:11:41.212+00:00"
   },
   {
-    "id": 108,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "product_management",
-    "proficiency": 1,
-    "usage_count": 0,
-    "last_used_at": null,
-    "created_at": "2026-02-23T02:18:29.103965+00:00",
-    "updated_at": "2026-02-23T02:18:29.103965+00:00"
-  },
-  {
     "id": 109,
     "agent_id": "agent-toji-1770840215950",
     "skill_name": "planning_execution",
@@ -993,16 +933,6 @@
     "id": 110,
     "agent_id": "agent-toji-1770840215950",
     "skill_name": "decision_frameworks",
-    "proficiency": 1,
-    "usage_count": 0,
-    "last_used_at": null,
-    "created_at": "2026-02-23T02:18:29.103965+00:00",
-    "updated_at": "2026-02-23T02:18:29.103965+00:00"
-  },
-  {
-    "id": 111,
-    "agent_id": "agent-toji-1770840215950",
-    "skill_name": "startup_analysis",
     "proficiency": 1,
     "usage_count": 0,
     "last_used_at": null,
@@ -1130,54 +1060,24 @@
     "updated_at": "2026-02-23T17:16:04.439786+00:00"
   },
   {
-    "id": 124,
+    "id": 88,
     "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "decision_frameworks",
+    "skill_name": "market_sizing",
     "proficiency": 1,
-    "usage_count": 1,
-    "last_used_at": "2026-02-23T17:49:37.528+00:00",
-    "created_at": "2026-02-23T17:49:39.093526+00:00",
-    "updated_at": "2026-02-23T17:49:39.093526+00:00"
-  },
-  {
-    "id": 125,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "clean_code",
-    "proficiency": 1,
-    "usage_count": 1,
-    "last_used_at": "2026-02-23T17:49:37.528+00:00",
-    "created_at": "2026-02-23T17:49:39.321442+00:00",
-    "updated_at": "2026-02-23T17:49:39.321442+00:00"
-  },
-  {
-    "id": 126,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "code_review_excellence",
-    "proficiency": 1,
-    "usage_count": 2,
-    "last_used_at": "2026-02-23T18:34:07.429+00:00",
-    "created_at": "2026-02-23T17:49:39.547022+00:00",
-    "updated_at": "2026-02-23T18:34:07.429+00:00"
-  },
-  {
-    "id": 129,
-    "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "launch_strategy",
-    "proficiency": 1,
-    "usage_count": 1,
-    "last_used_at": "2026-02-23T18:34:07.429+00:00",
-    "created_at": "2026-02-23T18:34:09.464785+00:00",
-    "updated_at": "2026-02-23T18:34:09.464785+00:00"
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T18:33:21.649+00:00",
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-24T18:33:21.649+00:00"
   },
   {
     "id": 128,
     "agent_id": "agent-ein-1771869007309",
     "skill_name": "general_task_execution",
-    "proficiency": 1,
-    "usage_count": 4,
-    "last_used_at": "2026-02-23T19:27:38.147+00:00",
+    "proficiency": 2,
+    "usage_count": 5,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
     "created_at": "2026-02-23T17:54:13.343236+00:00",
-    "updated_at": "2026-02-23T19:27:38.147+00:00"
+    "updated_at": "2026-02-24T17:47:14.416+00:00"
   },
   {
     "id": 139,
@@ -1200,24 +1100,24 @@
     "updated_at": "2026-02-23T19:27:38.147+00:00"
   },
   {
-    "id": 134,
-    "agent_id": "agent-ein-1771869007309",
-    "skill_name": "quality_assurance",
+    "id": 108,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "product_management",
     "proficiency": 1,
     "usage_count": 3,
-    "last_used_at": "2026-02-23T19:27:38.147+00:00",
-    "created_at": "2026-02-23T19:21:06.516002+00:00",
-    "updated_at": "2026-02-23T19:27:38.147+00:00"
+    "last_used_at": "2026-02-24T22:14:10.459+00:00",
+    "created_at": "2026-02-23T02:18:29.103965+00:00",
+    "updated_at": "2026-02-24T22:14:10.459+00:00"
   },
   {
-    "id": 135,
+    "id": 127,
     "agent_id": "agent-ein-1771869007309",
-    "skill_name": "seo_optimization",
-    "proficiency": 1,
-    "usage_count": 3,
-    "last_used_at": "2026-02-23T19:27:38.147+00:00",
-    "created_at": "2026-02-23T19:21:06.802582+00:00",
-    "updated_at": "2026-02-23T19:27:38.147+00:00"
+    "skill_name": "documentation",
+    "proficiency": 2,
+    "usage_count": 6,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
+    "created_at": "2026-02-23T17:54:13.090307+00:00",
+    "updated_at": "2026-02-24T17:47:12.451+00:00"
   },
   {
     "id": 137,
@@ -1230,24 +1130,24 @@
     "updated_at": "2026-02-23T19:27:38.147+00:00"
   },
   {
-    "id": 127,
-    "agent_id": "agent-ein-1771869007309",
-    "skill_name": "documentation",
-    "proficiency": 2,
-    "usage_count": 5,
-    "last_used_at": "2026-02-23T19:27:38.147+00:00",
-    "created_at": "2026-02-23T17:54:13.090307+00:00",
-    "updated_at": "2026-02-23T19:27:39.84+00:00"
-  },
-  {
     "id": 136,
     "agent_id": "agent-ein-1771869007309",
     "skill_name": "information_architecture",
     "proficiency": 1,
-    "usage_count": 3,
-    "last_used_at": "2026-02-23T19:27:38.147+00:00",
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
     "created_at": "2026-02-23T19:21:07.305268+00:00",
-    "updated_at": "2026-02-23T19:27:38.147+00:00"
+    "updated_at": "2026-02-24T17:47:12.451+00:00"
+  },
+  {
+    "id": 142,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "prose_quality",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T23:48:24.235+00:00",
+    "created_at": "2026-02-23T19:34:21.960323+00:00",
+    "updated_at": "2026-02-24T23:48:24.235+00:00"
   },
   {
     "id": 138,
@@ -1270,24 +1170,24 @@
     "updated_at": "2026-02-23T19:27:38.147+00:00"
   },
   {
-    "id": 142,
+    "id": 124,
     "agent_id": "agent-sahaquiel-1770840215198",
-    "skill_name": "prose_quality",
-    "proficiency": 1,
-    "usage_count": 2,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-23T19:34:21.960323+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
+    "skill_name": "decision_frameworks",
+    "proficiency": 2,
+    "usage_count": 10,
+    "last_used_at": "2026-02-24T23:48:24.235+00:00",
+    "created_at": "2026-02-23T17:49:39.093526+00:00",
+    "updated_at": "2026-02-24T23:48:24.235+00:00"
   },
   {
-    "id": 130,
+    "id": 135,
     "agent_id": "agent-ein-1771869007309",
-    "skill_name": "market_research",
+    "skill_name": "seo_optimization",
     "proficiency": 1,
-    "usage_count": 3,
-    "last_used_at": "2026-02-23T19:27:38.147+00:00",
-    "created_at": "2026-02-23T19:21:05.392852+00:00",
-    "updated_at": "2026-02-23T19:27:38.147+00:00"
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
+    "created_at": "2026-02-23T19:21:06.802582+00:00",
+    "updated_at": "2026-02-24T17:47:12.451+00:00"
   },
   {
     "id": 131,
@@ -1313,20 +1213,720 @@
     "id": 141,
     "agent_id": "agent-sahaquiel-1770840215198",
     "skill_name": "product_management",
+    "proficiency": 5,
+    "usage_count": 35,
+    "last_used_at": "2026-02-25T03:36:01.9+00:00",
+    "created_at": "2026-02-23T19:34:21.50432+00:00",
+    "updated_at": "2026-02-25T03:36:03.072+00:00"
+  },
+  {
+    "id": 72,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "seo_optimization",
     "proficiency": 1,
     "usage_count": 2,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
-    "created_at": "2026-02-23T19:34:21.50432+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
+    "last_used_at": "2026-02-24T17:25:04.751+00:00",
+    "created_at": "2026-02-18T02:11:43.164333+00:00",
+    "updated_at": "2026-02-24T17:25:04.751+00:00"
+  },
+  {
+    "id": 129,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "launch_strategy",
+    "proficiency": 1,
+    "usage_count": 2,
+    "last_used_at": "2026-02-24T17:52:49.668+00:00",
+    "created_at": "2026-02-23T18:34:09.464785+00:00",
+    "updated_at": "2026-02-24T17:52:49.668+00:00"
+  },
+  {
+    "id": 134,
+    "agent_id": "agent-ein-1771869007309",
+    "skill_name": "quality_assurance",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T22:12:12.629+00:00",
+    "created_at": "2026-02-23T19:21:06.516002+00:00",
+    "updated_at": "2026-02-24T22:12:12.629+00:00"
+  },
+  {
+    "id": 125,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "clean_code",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T18:33:21.649+00:00",
+    "created_at": "2026-02-23T17:49:39.321442+00:00",
+    "updated_at": "2026-02-24T18:33:21.649+00:00"
+  },
+  {
+    "id": 145,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "knowledge_synthesis",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:15:55.514+00:00",
+    "created_at": "2026-02-24T17:15:56.654969+00:00",
+    "updated_at": "2026-02-24T17:15:56.654969+00:00"
+  },
+  {
+    "id": 111,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "startup_analysis",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:15:55.514+00:00",
+    "created_at": "2026-02-23T02:18:29.103965+00:00",
+    "updated_at": "2026-02-24T17:15:55.514+00:00"
+  },
+  {
+    "id": 146,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "deep_research",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:15:55.514+00:00",
+    "created_at": "2026-02-24T17:15:57.206316+00:00",
+    "updated_at": "2026-02-24T17:15:57.206316+00:00"
+  },
+  {
+    "id": 147,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "market_sizing",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:15:55.514+00:00",
+    "created_at": "2026-02-24T17:15:57.452597+00:00",
+    "updated_at": "2026-02-24T17:15:57.452597+00:00"
+  },
+  {
+    "id": 130,
+    "agent_id": "agent-ein-1771869007309",
+    "skill_name": "market_research",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
+    "created_at": "2026-02-23T19:21:05.392852+00:00",
+    "updated_at": "2026-02-24T17:47:12.451+00:00"
+  },
+  {
+    "id": 148,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "research_methodology",
+    "proficiency": 1,
+    "usage_count": 2,
+    "last_used_at": "2026-02-24T22:14:10.459+00:00",
+    "created_at": "2026-02-24T17:15:57.691963+00:00",
+    "updated_at": "2026-02-24T22:14:10.459+00:00"
+  },
+  {
+    "id": 92,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "research_methodology",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-25T03:09:54.457+00:00",
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-25T03:09:54.457+00:00"
+  },
+  {
+    "id": 143,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "planning_execution",
+    "proficiency": 2,
+    "usage_count": 11,
+    "last_used_at": "2026-02-24T18:33:21.649+00:00",
+    "created_at": "2026-02-24T13:03:57.312252+00:00",
+    "updated_at": "2026-02-24T18:33:21.649+00:00"
   },
   {
     "id": 86,
     "agent_id": "agent-sahaquiel-1770840215198",
     "skill_name": "deep_research",
+    "proficiency": 3,
+    "usage_count": 20,
+    "last_used_at": "2026-02-25T03:36:01.9+00:00",
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-25T03:36:01.9+00:00"
+  },
+  {
+    "id": 87,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "competitive_analysis",
+    "proficiency": 3,
+    "usage_count": 12,
+    "last_used_at": "2026-02-24T18:33:21.649+00:00",
+    "created_at": "2026-02-23T02:16:24.052079+00:00",
+    "updated_at": "2026-02-24T18:33:28.366+00:00"
+  },
+  {
+    "id": 126,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "code_review_excellence",
+    "proficiency": 3,
+    "usage_count": 18,
+    "last_used_at": "2026-02-25T01:36:42.051+00:00",
+    "created_at": "2026-02-23T17:49:39.547022+00:00",
+    "updated_at": "2026-02-25T01:36:42.051+00:00"
+  },
+  {
+    "id": 144,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "conversion_optimization",
+    "proficiency": 2,
+    "usage_count": 11,
+    "last_used_at": "2026-02-24T23:31:54.744+00:00",
+    "created_at": "2026-02-24T15:51:02.296214+00:00",
+    "updated_at": "2026-02-24T23:31:54.744+00:00"
+  },
+  {
+    "id": 149,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "competitive_analysis",
     "proficiency": 1,
     "usage_count": 2,
-    "last_used_at": "2026-02-23T19:37:47.763+00:00",
+    "last_used_at": "2026-02-24T17:28:34.748+00:00",
+    "created_at": "2026-02-24T17:25:06.809299+00:00",
+    "updated_at": "2026-02-24T17:28:34.748+00:00"
+  },
+  {
+    "id": 155,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "product_management",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:32:54.228+00:00",
+    "created_at": "2026-02-24T17:32:55.075367+00:00",
+    "updated_at": "2026-02-24T17:32:55.075367+00:00"
+  },
+  {
+    "id": 156,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "market_research",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:36:45.969+00:00",
+    "created_at": "2026-02-24T17:36:46.166523+00:00",
+    "updated_at": "2026-02-24T17:36:46.166523+00:00"
+  },
+  {
+    "id": 157,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "competitive_intel",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:36:45.969+00:00",
+    "created_at": "2026-02-24T17:36:46.41539+00:00",
+    "updated_at": "2026-02-24T17:36:46.41539+00:00"
+  },
+  {
+    "id": 159,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "business_modeling",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:36:45.969+00:00",
+    "created_at": "2026-02-24T17:36:46.90333+00:00",
+    "updated_at": "2026-02-24T17:36:46.90333+00:00"
+  },
+  {
+    "id": 160,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "startup_analysis",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:36:45.969+00:00",
+    "created_at": "2026-02-24T17:36:47.656787+00:00",
+    "updated_at": "2026-02-24T17:36:47.656787+00:00"
+  },
+  {
+    "id": 161,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "code_review_excellence",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:36:45.969+00:00",
+    "created_at": "2026-02-24T17:36:48.129939+00:00",
+    "updated_at": "2026-02-24T17:36:48.129939+00:00"
+  },
+  {
+    "id": 162,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "launch_strategy",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:36:45.969+00:00",
+    "created_at": "2026-02-24T17:36:48.354331+00:00",
+    "updated_at": "2026-02-24T17:36:48.354331+00:00"
+  },
+  {
+    "id": 152,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "test_design",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T17:39:48.325+00:00",
+    "created_at": "2026-02-24T17:31:03.535249+00:00",
+    "updated_at": "2026-02-24T17:39:48.325+00:00"
+  },
+  {
+    "id": 153,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "funnel_design",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T17:39:48.325+00:00",
+    "created_at": "2026-02-24T17:31:03.76473+00:00",
+    "updated_at": "2026-02-24T17:39:48.325+00:00"
+  },
+  {
+    "id": 85,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "competitive_intel",
+    "proficiency": 3,
+    "usage_count": 20,
+    "last_used_at": "2026-02-25T01:49:08.189+00:00",
     "created_at": "2026-02-23T02:16:24.052079+00:00",
-    "updated_at": "2026-02-23T19:37:47.763+00:00"
+    "updated_at": "2026-02-25T01:49:08.189+00:00"
+  },
+  {
+    "id": 150,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "code_review_excellence",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:25:04.751+00:00",
+    "created_at": "2026-02-24T17:25:07.031156+00:00",
+    "updated_at": "2026-02-24T17:25:07.031156+00:00"
+  },
+  {
+    "id": 168,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "data_analysis",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T22:55:47.704+00:00",
+    "created_at": "2026-02-24T17:43:27.943447+00:00",
+    "updated_at": "2026-02-24T22:55:47.704+00:00"
+  },
+  {
+    "id": 158,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "strategic_planning",
+    "proficiency": 1,
+    "usage_count": 2,
+    "last_used_at": "2026-02-24T17:39:48.325+00:00",
+    "created_at": "2026-02-24T17:36:46.668948+00:00",
+    "updated_at": "2026-02-24T17:39:48.325+00:00"
+  },
+  {
+    "id": 151,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "copywriting",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T17:39:48.325+00:00",
+    "created_at": "2026-02-24T17:31:03.302412+00:00",
+    "updated_at": "2026-02-24T17:39:48.325+00:00"
+  },
+  {
+    "id": 163,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "brand_storytelling",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:39:48.325+00:00",
+    "created_at": "2026-02-24T17:39:48.969916+00:00",
+    "updated_at": "2026-02-24T17:39:48.969916+00:00"
+  },
+  {
+    "id": 164,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "debugging",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:39:48.325+00:00",
+    "created_at": "2026-02-24T17:39:49.245832+00:00",
+    "updated_at": "2026-02-24T17:39:49.245832+00:00"
+  },
+  {
+    "id": 165,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "quality_assurance",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:39:48.325+00:00",
+    "created_at": "2026-02-24T17:39:49.484352+00:00",
+    "updated_at": "2026-02-24T17:39:49.484352+00:00"
+  },
+  {
+    "id": 154,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "competitive_analysis",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T17:39:48.325+00:00",
+    "created_at": "2026-02-24T17:31:03.998202+00:00",
+    "updated_at": "2026-02-24T17:39:48.325+00:00"
+  },
+  {
+    "id": 166,
+    "agent_id": "agent-zeruel-1771457051",
+    "skill_name": "prose_quality",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:39:48.325+00:00",
+    "created_at": "2026-02-24T17:39:50.370036+00:00",
+    "updated_at": "2026-02-24T17:39:50.370036+00:00"
+  },
+  {
+    "id": 169,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "brand_storytelling",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:43:27.515+00:00",
+    "created_at": "2026-02-24T17:43:28.187253+00:00",
+    "updated_at": "2026-02-24T17:43:28.187253+00:00"
+  },
+  {
+    "id": 172,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "campaign_management",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:43:27.515+00:00",
+    "created_at": "2026-02-24T17:43:28.875811+00:00",
+    "updated_at": "2026-02-24T17:43:28.875811+00:00"
+  },
+  {
+    "id": 173,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "general_task_execution",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:43:27.515+00:00",
+    "created_at": "2026-02-24T17:43:29.091104+00:00",
+    "updated_at": "2026-02-24T17:43:29.091104+00:00"
+  },
+  {
+    "id": 174,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "product_management",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:43:27.515+00:00",
+    "created_at": "2026-02-24T17:43:29.306573+00:00",
+    "updated_at": "2026-02-24T17:43:29.306573+00:00"
+  },
+  {
+    "id": 175,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "planning_execution",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:43:27.515+00:00",
+    "created_at": "2026-02-24T17:43:29.5284+00:00",
+    "updated_at": "2026-02-24T17:43:29.5284+00:00"
+  },
+  {
+    "id": 176,
+    "agent_id": "agent-ein-1771869007309",
+    "skill_name": "data_analysis",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
+    "created_at": "2026-02-24T17:47:12.887414+00:00",
+    "updated_at": "2026-02-24T17:47:12.887414+00:00"
+  },
+  {
+    "id": 177,
+    "agent_id": "agent-ein-1771869007309",
+    "skill_name": "competitive_intel",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
+    "created_at": "2026-02-24T17:47:13.115404+00:00",
+    "updated_at": "2026-02-24T17:47:13.115404+00:00"
+  },
+  {
+    "id": 178,
+    "agent_id": "agent-ein-1771869007309",
+    "skill_name": "test_design",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
+    "created_at": "2026-02-24T17:47:13.308598+00:00",
+    "updated_at": "2026-02-24T17:47:13.308598+00:00"
+  },
+  {
+    "id": 179,
+    "agent_id": "agent-ein-1771869007309",
+    "skill_name": "planning_execution",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
+    "created_at": "2026-02-24T17:47:14.80826+00:00",
+    "updated_at": "2026-02-24T17:47:14.80826+00:00"
+  },
+  {
+    "id": 180,
+    "agent_id": "agent-ein-1771869007309",
+    "skill_name": "ab_testing",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T17:47:12.451+00:00",
+    "created_at": "2026-02-24T17:47:15.035463+00:00",
+    "updated_at": "2026-02-24T17:47:15.035463+00:00"
+  },
+  {
+    "id": 195,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "seo_optimization",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T22:55:47.704+00:00",
+    "created_at": "2026-02-24T22:24:19.796304+00:00",
+    "updated_at": "2026-02-24T22:55:47.704+00:00"
+  },
+  {
+    "id": 181,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "funnel_design",
+    "proficiency": 2,
+    "usage_count": 10,
+    "last_used_at": "2026-02-24T18:33:21.649+00:00",
+    "created_at": "2026-02-24T17:52:53.289694+00:00",
+    "updated_at": "2026-02-24T18:33:21.649+00:00"
+  },
+  {
+    "id": 184,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "startup_analysis",
+    "proficiency": 2,
+    "usage_count": 6,
+    "last_used_at": "2026-02-24T18:33:21.649+00:00",
+    "created_at": "2026-02-24T18:02:08.467288+00:00",
+    "updated_at": "2026-02-24T18:33:21.649+00:00"
+  },
+  {
+    "id": 196,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "keyword_strategy",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T22:55:47.704+00:00",
+    "created_at": "2026-02-24T22:24:20.019449+00:00",
+    "updated_at": "2026-02-24T22:55:47.704+00:00"
+  },
+  {
+    "id": 191,
+    "agent_id": "agent-ein-1771869007309",
+    "skill_name": "security_auditing",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T22:12:12.629+00:00",
+    "created_at": "2026-02-24T22:12:13.060371+00:00",
+    "updated_at": "2026-02-24T22:12:13.060371+00:00"
+  },
+  {
+    "id": 192,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "copywriting",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T22:14:10.459+00:00",
+    "created_at": "2026-02-24T22:14:11.132063+00:00",
+    "updated_at": "2026-02-24T22:14:11.132063+00:00"
+  },
+  {
+    "id": 193,
+    "agent_id": "agent-toji-1770840215950",
+    "skill_name": "content_marketing",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T22:14:10.459+00:00",
+    "created_at": "2026-02-24T22:14:12.475786+00:00",
+    "updated_at": "2026-02-24T22:14:12.475786+00:00"
+  },
+  {
+    "id": 182,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "knowledge_synthesis",
+    "proficiency": 3,
+    "usage_count": 13,
+    "last_used_at": "2026-02-25T01:09:51.217+00:00",
+    "created_at": "2026-02-24T17:52:53.752021+00:00",
+    "updated_at": "2026-02-25T01:09:51.217+00:00"
+  },
+  {
+    "id": 197,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "conversion_optimization",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T22:55:47.704+00:00",
+    "created_at": "2026-02-24T22:24:20.233052+00:00",
+    "updated_at": "2026-02-24T22:55:47.704+00:00"
+  },
+  {
+    "id": 185,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "backend_architecture",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T18:10:10.591+00:00",
+    "created_at": "2026-02-24T18:02:09.5835+00:00",
+    "updated_at": "2026-02-24T18:10:10.591+00:00"
+  },
+  {
+    "id": 183,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "api_design",
+    "proficiency": 2,
+    "usage_count": 5,
+    "last_used_at": "2026-02-24T18:10:10.591+00:00",
+    "created_at": "2026-02-24T17:52:55.499895+00:00",
+    "updated_at": "2026-02-24T18:10:17.515+00:00"
+  },
+  {
+    "id": 186,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "ab_testing",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T18:10:10.591+00:00",
+    "created_at": "2026-02-24T18:02:10.066838+00:00",
+    "updated_at": "2026-02-24T18:10:10.591+00:00"
+  },
+  {
+    "id": 201,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "marketing_psychology",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-25T01:23:41.193+00:00",
+    "created_at": "2026-02-25T01:14:39.027846+00:00",
+    "updated_at": "2026-02-25T01:23:41.193+00:00"
+  },
+  {
+    "id": 187,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "debugging",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T18:23:42.79+00:00",
+    "created_at": "2026-02-24T18:23:45.42272+00:00",
+    "updated_at": "2026-02-24T18:23:45.42272+00:00"
+  },
+  {
+    "id": 189,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "pricing_strategy",
+    "proficiency": 1,
+    "usage_count": 1,
+    "last_used_at": "2026-02-24T18:23:42.79+00:00",
+    "created_at": "2026-02-24T18:23:49.190847+00:00",
+    "updated_at": "2026-02-24T18:23:49.190847+00:00"
+  },
+  {
+    "id": 198,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "keyword_strategy",
+    "proficiency": 2,
+    "usage_count": 6,
+    "last_used_at": "2026-02-25T01:45:45.104+00:00",
+    "created_at": "2026-02-24T22:35:15.402018+00:00",
+    "updated_at": "2026-02-25T01:45:45.104+00:00"
+  },
+  {
+    "id": 188,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "content_marketing",
+    "proficiency": 2,
+    "usage_count": 8,
+    "last_used_at": "2026-02-25T01:49:08.189+00:00",
+    "created_at": "2026-02-24T18:23:48.71547+00:00",
+    "updated_at": "2026-02-25T01:49:08.189+00:00"
+  },
+  {
+    "id": 167,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "market_research",
+    "proficiency": 1,
+    "usage_count": 4,
+    "last_used_at": "2026-02-24T22:55:47.704+00:00",
+    "created_at": "2026-02-24T17:43:27.692092+00:00",
+    "updated_at": "2026-02-24T22:55:47.704+00:00"
+  },
+  {
+    "id": 190,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "wiki_architecture",
+    "proficiency": 2,
+    "usage_count": 6,
+    "last_used_at": "2026-02-24T23:31:54.744+00:00",
+    "created_at": "2026-02-24T18:29:02.176766+00:00",
+    "updated_at": "2026-02-24T23:31:54.744+00:00"
+  },
+  {
+    "id": 170,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "quality_assurance",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T23:32:27.712+00:00",
+    "created_at": "2026-02-24T17:43:28.434847+00:00",
+    "updated_at": "2026-02-24T23:32:27.712+00:00"
+  },
+  {
+    "id": 194,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "security_auditing",
+    "proficiency": 1,
+    "usage_count": 2,
+    "last_used_at": "2026-02-24T23:32:27.712+00:00",
+    "created_at": "2026-02-24T22:19:48.734852+00:00",
+    "updated_at": "2026-02-24T23:32:27.712+00:00"
+  },
+  {
+    "id": 199,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "social_media",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T23:37:47.701+00:00",
+    "created_at": "2026-02-24T22:46:48.639588+00:00",
+    "updated_at": "2026-02-24T23:37:47.701+00:00"
+  },
+  {
+    "id": 171,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "test_design",
+    "proficiency": 2,
+    "usage_count": 7,
+    "last_used_at": "2026-02-24T23:37:47.701+00:00",
+    "created_at": "2026-02-24T17:43:28.659962+00:00",
+    "updated_at": "2026-02-24T23:37:47.701+00:00"
+  },
+  {
+    "id": 200,
+    "agent_id": "agent-ritsuko-1771357483840",
+    "skill_name": "code_review_excellence",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-24T23:37:47.701+00:00",
+    "created_at": "2026-02-24T22:46:49.085005+00:00",
+    "updated_at": "2026-02-24T23:37:47.701+00:00"
+  },
+  {
+    "id": 202,
+    "agent_id": "agent-sahaquiel-1770840215198",
+    "skill_name": "doc_templates",
+    "proficiency": 1,
+    "usage_count": 3,
+    "last_used_at": "2026-02-25T01:49:08.189+00:00",
+    "created_at": "2026-02-25T01:33:56.828961+00:00",
+    "updated_at": "2026-02-25T01:49:08.189+00:00"
   }
 ]
