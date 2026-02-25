@@ -1,6 +1,50 @@
 # Frasier — Completed Features
 
-> Last updated: Feb 24, 2026 (v0.10.0)
+> Last updated: Feb 24, 2026 (v0.11.0)
+
+---
+
+## Autonomous Delivery — Iterative Research + Budget-Aware Execution (v0.11.0)
+
+### Iterative Research Loop
+- **File:** `src/lib/pipeline.js` — `runGapAnalysis()`
+- After initial search round, a T1 LLM call identifies missing topics in collected research
+- Returns `{ gaps, additionalQueries, sufficient }` — specific follow-up queries for missing coverage
+- Up to 3 gap-analysis → targeted-follow-up-search cycles per research step
+- Fail-open: errors during gap analysis return `{ sufficient: true }` — never blocks execution
+
+### Budget Tracker
+- **File:** `src/lib/pipeline.js` — `buildSynthesizePrompt()`
+- `runResearch()` now returns a `budgetUsed` object: `{ queriesUsed, fetchesUsed, queriesMax, fetchesMax }`
+- Injected into synthesis prompt as `RESEARCH BUDGET USED` section
+- Agents see exactly how much of their search budget was consumed and cite what they actually found
+- Based on Google's Budget Tracker pattern (40% fewer wasted/hallucinated citations)
+
+### Expanded Research Limits
+- **File:** `src/lib/capabilities.js` — `RESEARCH_LIMITS` constant
+- `MAX_QUERIES_PER_STEP`: 4 → 6, `MAX_FETCHES_PER_STEP`: 8 → 16, `MAX_URLS_PER_QUERY`: 2 → 3
+- `MAX_RESEARCH_ITERATIONS`: 3 (new — gap analysis cycles)
+- `MAX_CHARS_PER_PAGE`: 8,000 (unchanged)
+- Single source of truth — consumed by both decomposition prompt and pipeline execution
+
+### Quantitative Tool Budgets in Decomposition
+- **File:** `src/lib/capabilities.js` — `buildCapabilityManifest()`
+- New `TOOL BUDGET PER STEP (HARD LIMITS)` section with exact numeric limits
+- New `HOW TO SPLIT TASKS BASED ON BUDGET` guide with MapReduce pattern
+- Example: "Analyze 10 competitors" → 5 parallel research steps (2 each) + 1 synthesis step
+- Acceptance criteria scoping: "MUST be achievable within one step's budget"
+
+### Test Agent Leak Fix
+- **File:** `src/heartbeat.js` — `processApprovals()`
+- Added `if (!a.team_id) return false;` guard in domain expert selection
+- Test agents (team_id: null) excluded from production review rotation
+
+### Tests
+- 19 new tests in `tests/v011/autonomous-delivery.test.js`
+- 2 test agent filtering, 3 expanded limits, 3 tool budgets, 2 MapReduce guidance
+- 2 budget-aware acceptance criteria, 3 iterative gap analysis, 2 budget tracker
+- 2 full pipeline integration (research and engineering paths)
+- Total: 507 tests across 35 suites, zero regressions
 
 ---
 

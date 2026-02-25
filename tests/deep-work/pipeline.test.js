@@ -221,18 +221,22 @@ describe('pipeline.execute() — full pipeline flow', () => {
     expect(result.error).toBeNull();
     expect(result.content).toBeTruthy();
 
-    // Should have called LLM 3 times: decompose, synthesize, critique
+    // Should have called LLM 4 times: decompose, gap analysis, synthesize, critique
     // (no revise because default critique score is 3.8 >= 3)
-    expect(mockCallLLM).toHaveBeenCalledTimes(3);
+    // v0.11.0: gap analysis LLM call added between research and synthesize phases
+    expect(mockCallLLM).toHaveBeenCalledTimes(4);
 
     // Decompose should use tier1 (cheap)
     expect(mockCallLLM.mock.calls[0][0].forceTier).toBe('tier1');
 
+    // Gap analysis should use tier1 (cheap, v0.11.0)
+    expect(mockCallLLM.mock.calls[1][0].forceTier).toBe('tier1');
+
     // Synthesize should use the step's effective tier
-    expect(mockCallLLM.mock.calls[1][0].forceTier).toBe('tier2');
+    expect(mockCallLLM.mock.calls[2][0].forceTier).toBe('tier2');
 
     // Critique should use tier1 (cheap)
-    expect(mockCallLLM.mock.calls[2][0].forceTier).toBe('tier1');
+    expect(mockCallLLM.mock.calls[3][0].forceTier).toBe('tier1');
 
     // Should have searched the web
     expect(mockSearchWeb).toHaveBeenCalled();
@@ -306,9 +310,9 @@ describe('pipeline.execute() — full pipeline flow', () => {
       effectiveTier: 'tier2'
     });
 
-    // v0.9.0: critique + revise + re-critique loop
-    // decompose + synthesize + critique(1) + revise + critique(2) = 5
-    expect(mockCallLLM).toHaveBeenCalledTimes(5);
+    // v0.11.0: critique + revise + re-critique loop (with gap analysis)
+    // decompose + gap_analysis + synthesize + critique(1) + revise + critique(2) = 6
+    expect(mockCallLLM).toHaveBeenCalledTimes(6);
 
     // Final content should be the revised version
     expect(result.content).toContain('Revised Analysis');
@@ -451,7 +455,7 @@ describe('research phase — web search', () => {
     );
   });
 
-  test('caps web fetches at 8 per step', async () => {
+  test('caps web fetches at 16 per step', async () => {
     // Return many search results
     mockSearchWeb.mockResolvedValue({
       results: Array(10).fill(null).map((_, i) => ({
@@ -478,8 +482,8 @@ describe('research phase — web search', () => {
       effectiveTier: 'tier2'
     });
 
-    // fetchPage should be called at most 8 times total
-    expect(mockFetchPage.mock.calls.length).toBeLessThanOrEqual(8);
+    // fetchPage should be called at most 16 times total (v0.11.0: expanded from 8)
+    expect(mockFetchPage.mock.calls.length).toBeLessThanOrEqual(16);
   });
 
   test('research phase gracefully handles search failures', async () => {

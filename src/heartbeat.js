@@ -661,6 +661,10 @@ async function processApprovals() {
       if (domainRole) {
         const allAgents = await agents.getAllActiveAgents();
         const domainExpert = allAgents.find(a => {
+          // WHY team_id filter: test-memory-agent (team_id: null) was selected as domain
+          // expert reviewer for real work (Step #159, ISS-027). Same filter as
+          // findBestAgentAcrossTeams() line 893 — agents without teams are test/system agents.
+          if (!a.team_id) return false;
           if (a.id === step.assigned_agent_id) return false; // Can't review own work
           const keywords = missions.ROLE_KEYWORDS[domainRole] || [];
           return keywords.some(kw => (a.role || '').toLowerCase().includes(kw));

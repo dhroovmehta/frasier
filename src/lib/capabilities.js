@@ -11,6 +11,26 @@
 const models = require('./models');
 
 // ============================================================
+// QUANTITATIVE RESEARCH LIMITS
+// ============================================================
+
+// WHY: The decomposition engine needs numeric limits — not just qualitative
+// "can/cannot" — to right-size tasks. "Analyze 15 niches" with 8 fetches is
+// structurally impossible. The planner must know: each step gets exactly this
+// much budget, so split accordingly.
+//
+// v0.11.0: Expanded from 4 queries/8 fetches to 6 queries/16 fetches.
+// Combined with iterative gap analysis, this gives agents meaningful depth.
+
+const RESEARCH_LIMITS = {
+  MAX_QUERIES_PER_STEP: 6,       // Was 4 — Brave searches per step
+  MAX_FETCHES_PER_STEP: 16,      // Was 8 — total page fetches per step
+  MAX_URLS_PER_QUERY: 3,         // Was 2 — URLs fetched per search query
+  MAX_CHARS_PER_PAGE: 8000,      // Per-page content truncation limit
+  MAX_RESEARCH_ITERATIONS: 3     // Gap analysis → search → gap analysis cycles
+};
+
+// ============================================================
 // ROLE CAPABILITIES — What each agent role can and cannot do
 // ============================================================
 
@@ -21,9 +41,10 @@ const models = require('./models');
 const ROLE_CAPABILITIES = {
   research: {
     tools: [
-      'Web search via Brave API (up to 4 queries per task, 2 results per query)',
+      'Web search via Brave API (up to 6 queries per task, 3 results per query)',
       'Web search via DuckDuckGo (fallback when Brave unavailable)',
-      'URL fetching — read static web pages (max 8 pages per task, 8000 chars each)',
+      'URL fetching — read static web pages (max 16 pages per task, 8000 chars each)',
+      'Iterative research: search → gap analysis → targeted follow-up search (up to 3 iterations)',
       'Twitter/X reading via fxtwitter proxy (given a tweet URL)',
       'Agent-initiated web access via [WEB_SEARCH:query] and [WEB_FETCH:url] tags',
       'LLM-powered analysis, synthesis, and report writing'
@@ -194,15 +215,17 @@ const ROLE_CAPABILITIES = {
 // that exceed system-wide limits.
 
 const GLOBAL_CONSTRAINTS = `## GLOBAL EXECUTION CONSTRAINTS (Apply to ALL agents)
-- Web search: max 4 queries per task, 2 results per query (8 page fetches total)
-- Page content: max 8000 characters extracted per page (larger pages truncated)
+- Web search: max 6 queries per task, 3 results per query (up to 16 page fetches total)
+- Iterative research: after initial search, gap analysis identifies missing topics → up to 3 search iterations
+- Page content: max 8,000 characters extracted per page (larger pages truncated)
 - No headless browser: JavaScript-heavy pages (Reddit, Twitter feeds, SPAs) won't render properly
 - No authentication: agents cannot log into any website or service
 - No file creation: agents produce text output only, cannot create files on disk
 - No direct database access: agents cannot query databases or APIs directly
 - No real-time data: agents get a snapshot via web search, not live streaming data
 - LLM knowledge cutoff: agents have general knowledge but must verify current data via web search
-- Each task is executed independently: agents do not share state between tasks (only predecessor outputs in DAG)`;
+- Each task is executed independently: agents do not share state between tasks (only predecessor outputs in DAG)
+- Acceptance criteria for each task MUST be achievable within one step's tool budget — never require more searches or fetches than the limits above`;
 
 // ============================================================
 // BUILD CAPABILITY MANIFEST (for decomposition prompt)
@@ -219,6 +242,23 @@ function buildCapabilityManifest() {
   manifest += 'Each agent role has specific tools and hard limits. Every task MUST be achievable\n';
   manifest += 'using ONLY the assigned role\'s listed tools. Be creative — find alternative paths\n';
   manifest += 'to the same outcome when direct methods are unavailable.\n\n';
+
+  // WHY: Quantitative budget section — v0.10.0 had qualitative "can/cannot" but the planner
+  // still created tasks requiring 60+ searches when agents only have 16 fetches. Numbers
+  // force the planner to right-size tasks.
+  manifest += `## TOOL BUDGET PER STEP (HARD LIMITS)\n`;
+  manifest += `Each step gets exactly this much research capacity:\n`;
+  manifest += `- ${RESEARCH_LIMITS.MAX_QUERIES_PER_STEP} web search queries (Brave API)\n`;
+  manifest += `- ${RESEARCH_LIMITS.MAX_FETCHES_PER_STEP} page fetches total (${RESEARCH_LIMITS.MAX_URLS_PER_QUERY} URLs per query)\n`;
+  manifest += `- ${RESEARCH_LIMITS.MAX_CHARS_PER_PAGE.toLocaleString()} characters per page (truncated)\n`;
+  manifest += `- ${RESEARCH_LIMITS.MAX_RESEARCH_ITERATIONS} iterative research rounds (gap analysis → targeted follow-up)\n`;
+  manifest += `\n`;
+  manifest += `### HOW TO SPLIT TASKS BASED ON BUDGET\n`;
+  manifest += `- A step researching 2-3 items can dedicate 2-3 searches per item — fits within budget\n`;
+  manifest += `- A task covering more than 3 items needs multiple parallel steps (e.g., 10 niches → 5 parallel steps of 2 niches each)\n`;
+  manifest += `- ALWAYS add a synthesis step after parallel research steps to merge findings into one deliverable\n`;
+  manifest += `- Acceptance criteria MUST be achievable within one step's budget — never require more sources than the step can fetch\n`;
+  manifest += `- Example: "Analyze 10 competitors" → 5 parallel research steps (2 each) + 1 synthesis step\n\n`;
 
   for (const [role, cap] of Object.entries(ROLE_CAPABILITIES)) {
     manifest += `### ${role.toUpperCase()}\n`;
@@ -316,6 +356,7 @@ Rules:
 module.exports = {
   ROLE_CAPABILITIES,
   GLOBAL_CONSTRAINTS,
+  RESEARCH_LIMITS,
   buildCapabilityManifest,
   validatePlanFeasibility
 };

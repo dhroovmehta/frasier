@@ -629,8 +629,9 @@ describe('Revision loop with re-critique', () => {
     // No revision needed
     expect(result.revised).toBe(false);
 
-    // LLM calls: decompose + synthesize + critique = 3 (no revise)
-    expect(mockCallLLM).toHaveBeenCalledTimes(3);
+    // LLM calls: decompose + gap_analysis + synthesize + critique = 4 (no revise)
+    // v0.11.0: gap analysis LLM call added between research and synthesize phases
+    expect(mockCallLLM).toHaveBeenCalledTimes(4);
   });
 
   it('handles revise failure gracefully and falls back to previous content', async () => {

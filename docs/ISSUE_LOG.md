@@ -4,6 +4,22 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-027: test-memory-agent selected as domain expert reviewer for real work
+
+**Date:** Feb 24, 2026 | **Severity:** Medium | **Status:** Fixed (v0.11.0)
+
+**Symptom:** test-memory-agent (a test fixture with `team_id: null`) was being selected as the domain expert reviewer in `processApprovals()` for real mission steps. Test agents should never participate in production reviews.
+
+**Root Cause:** `processApprovals()` in `heartbeat.js` calls `getAllActiveAgents()` to find a domain expert reviewer. This returns ALL active agents including test fixtures. The function then matches by keyword (e.g., "research" in role) without checking whether the agent belongs to a real team. `findBestAgentAcrossTeams()` in `agents.js` correctly filters by `team_id`, but `processApprovals()` used a different code path that lacked this filter.
+
+**Fix:** Added `if (!a.team_id) return false;` guard before domain expert keyword matching in `processApprovals()`. Agents without a team_id (test fixtures, deactivated agents) are excluded from review rotation.
+
+**Decision:** D-042
+
+**Files:** `src/heartbeat.js`
+
+---
+
 ## ISS-026: Decomposition creates infeasible tasks — agents can't meet acceptance criteria
 
 **Date:** Feb 24, 2026 | **Severity:** High | **Status:** Fixed (v0.10.0)

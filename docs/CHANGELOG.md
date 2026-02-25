@@ -4,6 +4,43 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.11.0] — 2026-02-24 (Autonomous Delivery — Iterative Research + Budget-Aware Execution)
+
+### Added
+- **Iterative research loop** (`pipeline.js` — `runGapAnalysis()`) — After initial search, a T1 LLM call identifies missing topics in collected research. Up to 3 gap-analysis → targeted-follow-up cycles. Agents now deepen research instead of delivering shallow single-pass results.
+- **Budget tracker injection** — `buildSynthesizePrompt()` now receives a `budgetUsed` object (`{ queriesUsed, fetchesUsed, queriesMax, fetchesMax }`) and injects a `RESEARCH BUDGET USED` section into the synthesis prompt. Agents self-regulate and cite what they actually found.
+- **Quantitative tool budgets in decomposition prompt** — `buildCapabilityManifest()` now includes a `TOOL BUDGET PER STEP` section with exact numeric limits and a `HOW TO SPLIT TASKS BASED ON BUDGET` guide (MapReduce pattern: 10 competitors → 5 parallel steps of 2 + 1 synthesis step).
+- **`RESEARCH_LIMITS` constant** in `capabilities.js` — Centralized numeric limits (`MAX_QUERIES_PER_STEP`, `MAX_FETCHES_PER_STEP`, `MAX_URLS_PER_QUERY`, `MAX_CHARS_PER_PAGE`, `MAX_RESEARCH_ITERATIONS`) consumed by both the decomposition prompt and the pipeline execution engine.
+- **TDD Tests:** 19 new tests in `tests/v011/autonomous-delivery.test.js` — test agent filtering, expanded limits, tool budgets, MapReduce guidance, budget-aware acceptance criteria, iterative gap analysis, budget tracker, full pipeline integration.
+
+### Fixed
+- **ISS-027: test-memory-agent selected as domain expert reviewer** — `processApprovals()` in `heartbeat.js` used `getAllActiveAgents()` without team_id filtering. Test agents (team_id: null) could be selected as reviewers for real work. Added `if (!a.team_id) return false;` guard before domain expert matching.
+
+### Changed
+- **Research limits expanded** — `MAX_QUERIES_PER_STEP`: 4 → 6, `MAX_FETCHES_PER_STEP`: 8 → 16, `MAX_URLS_PER_QUERY`: 2 → 3. Combined with iterative gap analysis, agents can now produce substantive research comparable to Manus-quality output.
+- **`executeSearchRound()`** now uses `RESEARCH_LIMITS` constants instead of hardcoded values. Accepts `existingFetches` parameter to respect cumulative budget across iterations.
+- **`runResearch()`** rewritten with iterative deepening: initial search → refined queries if < 3 sources → gap analysis loop (up to 3 iterations) → returns `budgetUsed` object.
+- **`ROLE_CAPABILITIES.research.tools`** updated to reflect new limits (6 queries, 16 fetches, 3 iterations).
+- **`GLOBAL_CONSTRAINTS`** updated with new limits and acceptance criteria scoping rule.
+
+### Modified
+- **`src/lib/capabilities.js`:** Added `RESEARCH_LIMITS`, updated `ROLE_CAPABILITIES`, updated `GLOBAL_CONSTRAINTS`, added tool budget and MapReduce sections to manifest.
+- **`src/lib/pipeline.js`:** Imported `RESEARCH_LIMITS`, rewrote `executeSearchRound()` + `runResearch()` + `runSynthesize()`, added `runGapAnalysis()`.
+- **`src/heartbeat.js`:** Added team_id null filter in `processApprovals()` domain expert selection.
+- **`tests/deep-work/pipeline.test.js`:** Updated LLM call counts and fetch cap assertions for new limits.
+- **`tests/v09/research-quality.test.js`:** Updated mock threshold for expanded URL-per-query count.
+- **`tests/v09/critique-calibration.test.js`:** Updated LLM call count for gap analysis addition.
+
+### Notes
+- All 507 tests pass (488 existing + 19 new, zero regressions).
+- 35 test suites.
+- Decision: D-042. Issue: ISS-027.
+- Zero new dependencies.
+- Cost: ~200-400 extra tokens per gap analysis call (T1), up to 3 iterations per research step.
+- Research: Based on Google Budget Tracker pattern (40% fewer wasted searches), Manus/Step-DeepResearch iterative loop, MapReduce decomposition for parallel work.
+
+---
+
 ## [0.10.0] — 2026-02-24 (Capability-Aware Decomposition)
 
 ### Added

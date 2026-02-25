@@ -297,10 +297,13 @@ describe('Research Depth Enforcement', () => {
     let searchCallCount = 0;
 
     // First set of searches returns thin content, retries get better content
+    // v0.11.0: threshold raised from 2 to 3 because MAX_URLS_PER_QUERY expanded
+    // from 2 to 3 — with the old threshold, the 3rd initial query would fetch 3
+    // substantive URLs and skip the retry path entirely
     mockSearchWeb.mockImplementation(async (query) => {
       searchCallCount++;
-      if (searchCallCount <= 2) {
-        // First round: only thin results
+      if (searchCallCount <= 3) {
+        // First round: only thin results (all 3 initial queries)
         return {
           results: [{ title: 'Thin', url: `https://example.com/thin-${searchCallCount}`, snippet: 'Brief' }],
           error: null

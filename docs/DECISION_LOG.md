@@ -4,6 +4,48 @@ All architectural and design decisions, with context and trade-offs.
 
 ---
 
+## D-042: Autonomous Delivery — Iterative Research + Budget-Aware Execution
+
+**Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Despite 26 issues fixed across v0.1.0 through v0.10.0, zero projects have completed end-to-end autonomously. Analysis of the full issue log revealed a pattern: individual pipeline links are fixed in isolation, but the chain never works as a whole. Three structural problems remained:
+
+1. **Research too shallow:** 4 queries × 2 URLs = 8 max fetches per step. A task like "analyze 15 niches" needs 30+ fetches. Single-pass research with no iteration produces thin results.
+2. **Decomposition ignores tool budgets:** The capability manifest (v0.10.0) told the planner what agents *can* do, but not *how much*. Tasks like "analyze 10 competitors in one step" still exceeded per-step budgets.
+3. **Test agent leak:** test-memory-agent (team_id: null) appeared in review rotation because `processApprovals()` and `findBestAgentAcrossTeams()` use different code paths — the former lacked team_id filtering.
+
+Benchmark: Manus AI produces 18-page research reports by iterating (search → analyze gaps → search more → synthesize). Our agents did one pass and stopped.
+
+**Decision:** Seven coordinated changes:
+
+1. **Expand research limits** — 4→6 queries, 8→16 fetches, 2→3 URLs per query. Combined with iterative deepening, sufficient for substantive research.
+2. **Iterative research loop** — After initial search, T1 LLM identifies gaps in collected data. Up to 3 gap-analysis → targeted follow-up cycles before synthesis.
+3. **Quantitative tool budgets in decomposition prompt** — Exact numeric limits plus MapReduce guidance ("10 competitors → 5 parallel steps of 2 + synthesis").
+4. **Budget tracker injection** — `budgetUsed` object passed to synthesis prompt so agents know their remaining capacity and cite what they actually found.
+5. **Centralized `RESEARCH_LIMITS` constant** — Single source of truth consumed by both the decomposition prompt and the pipeline execution engine. No more hardcoded values.
+6. **Budget-aware acceptance criteria** — GLOBAL_CONSTRAINTS now includes: "Acceptance criteria MUST be achievable within one step's budget."
+7. **Team_id filter in review rotation** — Excludes test agents from `processApprovals()` domain expert selection.
+
+**Alternatives Considered:**
+1. Just increase fetch limits without iteration — more data but still no depth. Would waste tokens on broad-but-shallow results.
+2. Add a dedicated "research planner" agent — over-engineering. The gap analysis LLM call achieves the same result at ~200 tokens.
+3. Make QA more lenient on thin research — wrong fix. QA was right to reject shallow work. The fix belongs in the research pipeline.
+4. Switch to a headless browser for deeper scraping — violates VPS RAM constraints (1GB). Brave API + iteration is sufficient.
+
+**Trade-offs:**
+- (+) Agents can now iterate and deepen research — matches Manus/Step-DeepResearch quality patterns
+- (+) Budget tracker prevents agents from hallucinating sources they didn't fetch
+- (+) MapReduce guidance right-sizes decomposed plans to tool budgets
+- (+) Centralized limits constant prevents drift between planning and execution
+- (+) Low cost: gap analysis uses T1 (cheapest tier), ~200-400 tokens per call
+- (-) Up to 3 extra T1 LLM calls per research step (minimal cost, ~$0.001 per call)
+- (-) Research steps take longer due to iteration (acceptable — quality > speed)
+- (-) RESEARCH_LIMITS must be updated in one place when adding tools (by design — single source of truth)
+
+**Research:** Google Budget Tracker pattern (inject remaining budget into prompts, 40% fewer wasted searches), Manus iterative research loop (search → gap analysis → targeted follow-up), MapReduce decomposition pattern (parallel research + synthesis step).
+
+---
+
 ## D-041: Capability-Aware Decomposition — Manifest + Feasibility Gate
 
 **Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier

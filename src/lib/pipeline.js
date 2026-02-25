@@ -7,14 +7,17 @@
 // KEY DESIGN DECISIONS:
 // - Runs inside existing worker process (no new PM2 process)
 // - Phases run sequentially (safe for 1GB RAM VPS)
-// - Web fetches capped at 8 per step (bounded latency)
-// - Revise phase capped at 1 attempt (prevents loops)
+// - Web fetches capped at 16 per step (v0.11.0: expanded from 8)
+// - Iterative research: gap analysis after each search round (v0.11.0)
+// - Budget tracker injected into synthesize prompt (v0.11.0)
+// - Revise phase capped at 2 attempts (prevents loops)
 // - skipResearch config for engineering/creative tasks
 // - skipPipeline config for trivial tasks (legacy single-shot)
 
 const supabase = require('./supabase');
 const models = require('./models');
 const web = require('./web');
+const { RESEARCH_LIMITS } = require('./capabilities');
 
 // ============================================================
 // PHASE PROMPTS
@@ -59,7 +62,7 @@ Rules:
  * available sources so they can cite them precisely. The anti-hallucination
  * instruction ("Use ONLY these sources") prevents fabricated data.
  */
-function buildSynthesizePrompt(taskDescription, researchData, subQuestions) {
+function buildSynthesizePrompt(taskDescription, researchData, subQuestions, budgetUsed) {
   let prompt = `## SYNTHESIZE — Produce the deliverable
 
 **Task:** ${taskDescription}`;
@@ -84,6 +87,17 @@ function buildSynthesizePrompt(taskDescription, researchData, subQuestions) {
     for (const q of subQuestions) {
       prompt += `- ${q}\n`;
     }
+  }
+
+  // WHY budget tracker (v0.11.0): Google's research proves that injecting remaining
+  // resource budget into prompts cuts wasted tool calls by 40%. Agents self-regulate
+  // when they can see how much research capacity was used.
+  if (budgetUsed) {
+    prompt += `\n\n## RESEARCH BUDGET USED
+- Searches used: ${budgetUsed.queriesUsed} of ${budgetUsed.queriesMax} remaining
+- Pages fetched: ${budgetUsed.fetchesUsed} of ${budgetUsed.fetchesMax} remaining
+- Sources collected: ${(researchData || []).length} total
+Make the best use of the available research data. If critical information is missing, explicitly state what data was not found rather than guessing.`;
   }
 
   prompt += `\n\n## CRITICAL REQUIREMENTS
@@ -256,24 +270,26 @@ async function runDecompose(step, taskDescription, approachHints) {
  * Execute a single round of web research for the given search queries.
  * Returns raw results — counting and retry logic handled by runResearch().
  */
-async function executeSearchRound(step, searchQueries) {
+async function executeSearchRound(step, searchQueries, existingFetches = 0) {
   const results = [];
-  let totalFetches = 0;
-  const MAX_FETCHES = 8;
+  let totalFetches = existingFetches;
+  const MAX_FETCHES = RESEARCH_LIMITS.MAX_FETCHES_PER_STEP;
+  const MAX_QUERIES = RESEARCH_LIMITS.MAX_QUERIES_PER_STEP;
+  const MAX_URLS = RESEARCH_LIMITS.MAX_URLS_PER_QUERY;
 
-  for (const query of searchQueries.slice(0, 4)) {
+  for (const query of searchQueries.slice(0, MAX_QUERIES)) {
     if (totalFetches >= MAX_FETCHES) break;
 
-    const searchResult = await web.searchWeb(query, 3);
+    const searchResult = await web.searchWeb(query, MAX_URLS + 1);
     if (searchResult.error || searchResult.results.length === 0) {
       console.log(`[pipeline] Step #${step.id}: Search "${query}" returned no results`);
       continue;
     }
 
-    for (const result of searchResult.results.slice(0, 2)) {
+    for (const result of searchResult.results.slice(0, MAX_URLS)) {
       if (totalFetches >= MAX_FETCHES) break;
 
-      const page = await web.fetchPage(result.url, 6000);
+      const page = await web.fetchPage(result.url, RESEARCH_LIMITS.MAX_CHARS_PER_PAGE);
       totalFetches++;
 
       if (page.error || !page.content) {
@@ -348,56 +364,168 @@ Respond with ONLY JSON: {"refinedQueries": ["query1", "query2"]}`,
 }
 
 /**
- * Execute the research phase. Searches the web, validates source quality,
- * and retries with refined queries if insufficient substantive sources found.
+ * Run gap analysis on collected research. Identifies what topics are NOT covered
+ * and generates targeted queries to fill the gaps. Uses T1 (cheap) since this
+ * is meta-work, not the actual deliverable.
  *
- * WHY retry logic: The original research phase accepted whatever came back,
- * even if it was all thin/paywalled content. Now we require >= 3 substantive
- * sources (>500 chars) and retry up to 2 times with LLM-refined queries.
+ * WHY (v0.11.0): Single-pass research missed critical topics. Manus-level systems
+ * iterate: search → analyze → identify gaps → search more. Google's Budget Tracker
+ * research proves this pattern cuts wasted searches by 40%.
  *
- * @returns {{ researchData, structuredSources, substantiveSources, retriesAttempted, durationMs }}
+ * @returns {{ gaps, additionalQueries, sufficient }}
  */
-async function runResearch(step, searchQueries, taskDescription) {
+async function runGapAnalysis(step, taskDescription, researchData, subQuestions) {
+  const sourceSummary = researchData.map(r =>
+    `- [${r.title}]: ${(r.content || '').slice(0, 150)}...`
+  ).join('\n');
+
+  const result = await models.callLLM({
+    systemPrompt: 'You are a research quality auditor. Identify gaps in collected research. Respond only with valid JSON.',
+    userMessage: `## GAP ANALYSIS — Is this research sufficient?
+
+**Task:** ${taskDescription}
+
+**Sub-questions to address:**
+${(subQuestions || []).map(q => `- ${q}`).join('\n')}
+
+**Sources collected so far (${researchData.length} total):**
+${sourceSummary}
+
+Analyze whether these sources adequately cover ALL sub-questions. Identify specific gaps.
+
+Respond with ONLY JSON:
+{
+  "gaps": ["specific missing topic 1", "specific missing topic 2"],
+  "additionalQueries": ["targeted search query for gap 1", "targeted search query for gap 2"],
+  "sufficient": true/false
+}
+
+Rules:
+- "sufficient" is true ONLY if all sub-questions can be adequately answered
+- Each gap must be specific (not "more research needed" — say WHAT is missing)
+- Each additionalQuery must target a specific gap (not generic)
+- If sources are thin but cover the right topics, suggest deeper queries for the same topics`,
+    agentId: step.assigned_agent_id,
+    missionStepId: step.id,
+    forceTier: 'tier1'
+  });
+
+  if (result.error) {
+    // Gap analysis failure is non-fatal — proceed with what we have
+    console.log(`[pipeline] Step #${step.id}: Gap analysis LLM error, proceeding: ${result.error}`);
+    return { gaps: [], additionalQueries: [], sufficient: true };
+  }
+
+  try {
+    const cleaned = result.content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      gaps: parsed.gaps || [],
+      additionalQueries: parsed.additionalQueries || [],
+      sufficient: parsed.sufficient !== false
+    };
+  } catch (e) {
+    console.log(`[pipeline] Step #${step.id}: Gap analysis returned non-JSON, proceeding`);
+    return { gaps: [], additionalQueries: [], sufficient: true };
+  }
+}
+
+/**
+ * Execute the research phase with iterative deepening.
+ *
+ * v0.11.0: Replaces single-pass research with a loop:
+ * 1. Initial search round (up to 6 queries, 16 fetches)
+ * 2. Gap analysis — identifies what's missing
+ * 3. Targeted follow-up search for gaps (up to MAX_RESEARCH_ITERATIONS total)
+ * 4. Stop when gaps are filled or iterations exhausted
+ *
+ * Also tracks search/fetch budget for injection into synthesize prompt.
+ *
+ * @returns {{ researchData, structuredSources, substantiveSources, retriesAttempted, durationMs, budgetUsed }}
+ */
+async function runResearch(step, searchQueries, taskDescription, subQuestions) {
   const startTime = Date.now();
   const MIN_SUBSTANTIVE = 3;
-  const MAX_RETRIES = 2;
+  const MAX_ITERATIONS = RESEARCH_LIMITS.MAX_RESEARCH_ITERATIONS;
 
   let researchData = [];
-  let retriesAttempted = 0;
-  let currentQueries = searchQueries;
+  let totalFetchesUsed = 0;
+  let totalQueriesUsed = 0;
+  let iterationsCompleted = 0;
 
   // Initial search round
-  const initial = await executeSearchRound(step, currentQueries);
+  const initial = await executeSearchRound(step, searchQueries);
   researchData = initial.results;
+  totalFetchesUsed = initial.totalFetches;
+  totalQueriesUsed = searchQueries.slice(0, RESEARCH_LIMITS.MAX_QUERIES_PER_STEP).length;
 
-  // WHY: Retry with refined queries when sources are insufficient.
-  // Thin content (paywalled, stubs, error pages) doesn't count as substantive.
+  // WHY: Retry with refined queries when sources are insufficient (thin/paywalled).
   let substantiveCount = countSubstantiveSources(researchData);
-  while (substantiveCount < MIN_SUBSTANTIVE && retriesAttempted < MAX_RETRIES) {
-    retriesAttempted++;
-    console.log(`[pipeline] Step #${step.id}: Only ${substantiveCount} substantive sources, retrying (${retriesAttempted}/${MAX_RETRIES})`);
+  if (substantiveCount < MIN_SUBSTANTIVE) {
+    const refinedQueries = await generateRefinedQueries(step, searchQueries, taskDescription || '');
+    if (refinedQueries.length > 0) {
+      const retry = await executeSearchRound(step, refinedQueries, totalFetchesUsed);
+      const existingUrls = new Set(researchData.map(r => r.url));
+      for (const result of retry.results) {
+        if (!existingUrls.has(result.url)) {
+          researchData.push(result);
+          existingUrls.add(result.url);
+        }
+      }
+      totalFetchesUsed = retry.totalFetches;
+      totalQueriesUsed += refinedQueries.length;
+      substantiveCount = countSubstantiveSources(researchData);
+    }
+  }
 
-    const refinedQueries = await generateRefinedQueries(step, currentQueries, taskDescription || '');
-    if (refinedQueries.length === 0) break;
+  // Iterative gap analysis + targeted follow-up (v0.11.0)
+  // WHY: After getting initial results, ask "what's missing?" and search for it.
+  // Manus and Google BATS both show this pattern dramatically improves research depth.
+  while (iterationsCompleted < MAX_ITERATIONS && totalFetchesUsed < RESEARCH_LIMITS.MAX_FETCHES_PER_STEP) {
+    iterationsCompleted++;
+    console.log(`[pipeline] Step #${step.id}: Gap analysis iteration ${iterationsCompleted}/${MAX_ITERATIONS}`);
 
-    currentQueries = refinedQueries;
-    const retry = await executeSearchRound(step, refinedQueries);
+    const gapResult = await runGapAnalysis(step, taskDescription, researchData, subQuestions);
+
+    if (gapResult.sufficient || gapResult.additionalQueries.length === 0) {
+      console.log(`[pipeline] Step #${step.id}: Research sufficient after ${iterationsCompleted} iteration(s)`);
+      break;
+    }
+
+    // Execute targeted search for gaps
+    console.log(`[pipeline] Step #${step.id}: ${gapResult.gaps.length} gaps found, searching for: ${gapResult.additionalQueries.join(', ')}`);
+    const gapSearch = await executeSearchRound(step, gapResult.additionalQueries, totalFetchesUsed);
+
     // Merge new results (dedup by URL)
     const existingUrls = new Set(researchData.map(r => r.url));
-    for (const result of retry.results) {
+    for (const result of gapSearch.results) {
       if (!existingUrls.has(result.url)) {
         researchData.push(result);
         existingUrls.add(result.url);
       }
     }
+    totalFetchesUsed = gapSearch.totalFetches;
+    totalQueriesUsed += gapResult.additionalQueries.length;
     substantiveCount = countSubstantiveSources(researchData);
   }
 
   const structuredSources = buildStructuredSources(researchData);
   const durationMs = Date.now() - startTime;
-  console.log(`[pipeline] Step #${step.id}: Research phase found ${researchData.length} sources (${substantiveCount} substantive, ${retriesAttempted} retries)`);
+  console.log(`[pipeline] Step #${step.id}: Research phase found ${researchData.length} sources (${substantiveCount} substantive, ${iterationsCompleted} gap iterations, ${totalFetchesUsed} fetches used)`);
 
-  return { researchData, structuredSources, substantiveSources: substantiveCount, retriesAttempted, durationMs };
+  return {
+    researchData,
+    structuredSources,
+    substantiveSources: substantiveCount,
+    retriesAttempted: iterationsCompleted,
+    durationMs,
+    budgetUsed: {
+      queriesUsed: totalQueriesUsed,
+      fetchesUsed: totalFetchesUsed,
+      queriesMax: RESEARCH_LIMITS.MAX_QUERIES_PER_STEP,
+      fetchesMax: RESEARCH_LIMITS.MAX_FETCHES_PER_STEP
+    }
+  };
 }
 
 /**
@@ -406,9 +534,9 @@ async function runResearch(step, searchQueries, taskDescription) {
  *
  * @returns {{ content, tokens, durationMs }}
  */
-async function runSynthesize(step, promptData, taskDescription, researchData, subQuestions, effectiveTier) {
+async function runSynthesize(step, promptData, taskDescription, researchData, subQuestions, effectiveTier, budgetUsed) {
   const startTime = Date.now();
-  const userMessage = buildSynthesizePrompt(taskDescription, researchData, subQuestions);
+  const userMessage = buildSynthesizePrompt(taskDescription, researchData, subQuestions, budgetUsed);
 
   const result = await models.callLLM({
     systemPrompt: promptData.systemPrompt,
@@ -679,15 +807,17 @@ async function execute({ step, promptData, userMessage, effectiveTier, config = 
   phases.push({ name: 'decompose', durationMs: decompose.durationMs });
 
   // ──────────────────────────────────────────────
-  // PHASE 2: RESEARCH (skippable, with retry logic)
+  // PHASE 2: RESEARCH (skippable, with iterative gap analysis — v0.11.0)
   // ──────────────────────────────────────────────
   let researchData = [];
   let structuredSources = [];
+  let budgetUsed = null;
   if (!config.skipResearch) {
     console.log(`[pipeline] Step #${step.id}: Starting RESEARCH phase (${decompose.searchQueries.length} queries)`);
-    const research = await runResearch(step, decompose.searchQueries, userMessage);
+    const research = await runResearch(step, decompose.searchQueries, userMessage, decompose.subQuestions);
     researchData = research.researchData;
     structuredSources = research.structuredSources;
+    budgetUsed = research.budgetUsed || null;
 
     await logPhase(step.id, 'research', 2, {
       content: researchData.map(r => `[${r.title}](${r.url})`).join('\n'),
@@ -698,19 +828,20 @@ async function execute({ step, promptData, userMessage, effectiveTier, config = 
         sourcesFound: researchData.length,
         substantiveSources: research.substantiveSources,
         retriesAttempted: research.retriesAttempted,
-        structuredSources: research.structuredSources
+        structuredSources: research.structuredSources,
+        budgetUsed: research.budgetUsed
       }
     });
     phases.push({ name: 'research', durationMs: research.durationMs });
   }
 
   // ──────────────────────────────────────────────
-  // PHASE 3: SYNTHESIZE
+  // PHASE 3: SYNTHESIZE (with budget tracker — v0.11.0)
   // ──────────────────────────────────────────────
   console.log(`[pipeline] Step #${step.id}: Starting SYNTHESIZE phase (${effectiveTier})`);
   const synthesize = await runSynthesize(
     step, promptData, userMessage, researchData,
-    decompose.subQuestions, effectiveTier
+    decompose.subQuestions, effectiveTier, budgetUsed
   );
 
   if (synthesize.error) {
