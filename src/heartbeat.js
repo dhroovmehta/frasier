@@ -799,6 +799,11 @@ async function checkMissions() {
   const activeMissions = await missions.getActiveMissions();
 
   for (const mission of activeMissions) {
+    // ISS-028: Auto-fail pending steps permanently blocked by a failed predecessor.
+    // WHY: Without this, zombie pending steps clog the worker queue and prevent
+    // live missions from ever being picked up. Must run BEFORE checkMissionCompletion
+    // so the completion check sees the updated statuses.
+    await missions.failBlockedSteps(mission.id);
     await missions.checkMissionCompletion(mission.id);
   }
 }

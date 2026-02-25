@@ -4,6 +4,28 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.11.1] — 2026-02-25 (Zombie Step Cleanup — Queue Clog Fix)
+
+### Fixed
+- **ISS-028: Zombie step queue clog** — `getPendingSteps()` used `.limit(limit * 2)` (6 rows max), which meant pending steps from dead/failed missions filled the fetch window. Live mission steps were never reached by the worker. Removed the artificial limit; all pending steps are now fetched and filtered in JS with the existing `limit` cap.
+- **Auto-fail permanently blocked steps** — New `failBlockedSteps(missionId)` in `missions.js` detects pending steps that can never execute (step_order > earliest failed step) and auto-fails them with a clear reason. Called from `checkMissions()` in heartbeat before `checkMissionCompletion()`.
+
+### Added
+- **TDD Tests:** 6 new tests in `tests/v011/stalled-mission-cleanup.test.js` — failBlockedSteps (4 scenarios including parallel step safety and cascade), getPendingSteps source code verification.
+
+### Modified
+- **`src/lib/missions.js`:** Added `failBlockedSteps()`, removed `.limit(limit * 2)` from `getPendingSteps()`, exported `failBlockedSteps`.
+- **`src/heartbeat.js`:** Wired `failBlockedSteps()` into `checkMissions()` loop (runs before `checkMissionCompletion()`).
+
+### Notes
+- All 513 tests pass (507 existing + 6 new, zero regressions).
+- 36 test suites.
+- Decision: D-043. Issue: ISS-028.
+- Zero new dependencies. Zero cost increase.
+- Immediate data fix also applied: missions 87 and 90 failed via Supabase REST API to unblock Project #8.
+
+---
+
 ## [0.11.0] — 2026-02-24 (Autonomous Delivery — Iterative Research + Budget-Aware Execution)
 
 ### Added

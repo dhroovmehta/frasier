@@ -4,6 +4,26 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-028: Zombie step queue clog — worker starved by dead missions
+
+**Date:** Feb 25, 2026 | **Severity:** Critical | **Status:** Fixed (v0.11.1)
+
+**Symptom:** Project #8 (Autonomous Info Product Business) stalled overnight. Worker was alive and polling but produced no output. 6 of 19 steps completed, 13 stuck at pending. No errors in worker logs — it simply reported no eligible steps.
+
+**Root Cause:** `getPendingSteps(3)` fetched at most `.limit(3 * 2) = 6` rows, ordered by `step_order ASC, created_at ASC`. Three dead missions (87, 88, 90 from Projects 6 and 7) had 17 zombie pending steps with older timestamps. All 6 fetched rows came from these dead missions. Each failed dependency checks (predecessor steps were failed, so `isPreviousStepComplete()` returned false). The function returned an empty eligible list. Mission #91's steps were never fetched because they were beyond row 6 in the result set.
+
+**Fix (two-part):**
+1. **Removed `.limit(limit * 2)`** from `getPendingSteps()` — now fetches all pending unprocessed steps and filters in JS. The existing `if (eligible.length >= limit) break` still caps output.
+2. **New `failBlockedSteps(missionId)`** — auto-fails pending steps permanently blocked by a failed predecessor (step_order > min failed step_order). Wired into `checkMissions()` in heartbeat. Prevents zombie accumulation.
+
+**Immediate data fix:** Missions 87 and 90 manually failed via Supabase REST API to unblock the worker immediately.
+
+**Decision:** D-043
+
+**Files:** `src/lib/missions.js`, `src/heartbeat.js`
+
+---
+
 ## ISS-027: test-memory-agent selected as domain expert reviewer for real work
 
 **Date:** Feb 24, 2026 | **Severity:** Medium | **Status:** Fixed (v0.11.0)

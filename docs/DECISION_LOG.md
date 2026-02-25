@@ -4,6 +4,34 @@ All architectural and design decisions, with context and trade-offs.
 
 ---
 
+## D-043: Zombie Step Cleanup — Queue Resilience + Auto-Fail Cascade
+
+**Date:** Feb 25, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Project #8 stalled overnight despite a healthy worker process. Root cause: `getPendingSteps(3)` fetched at most 6 rows (`.limit(limit * 2)`). 17 zombie pending steps from dead missions 87 and 90 (Projects 6 and 7) occupied the entire fetch window. Each failed dependency checks and was skipped. The function returned empty. Mission #91's 13 pending steps were never reached. The worker had no work to do — not because there was none, but because it couldn't see it.
+
+This is the 28th issue in the log. The pattern is consistent: individually correct functions compose into a broken pipeline because upstream failures leave orphaned state that poisons downstream consumers.
+
+**Decision:** Two changes:
+
+1. **Remove `.limit(limit * 2)` from `getPendingSteps()`** — Fetch all pending unprocessed steps, check dependencies in the existing JS loop, return up to `limit` eligible ones. The existing `if (eligible.length >= limit) break` already caps output. No performance concern: pending steps in a healthy system number in the tens, not thousands.
+2. **New `failBlockedSteps(missionId)`** — For each active mission, find all pending steps permanently blocked by a failed predecessor (step_order > min failed step_order). Auto-fail them with a clear error message. Called from `checkMissions()` in heartbeat, before `checkMissionCompletion()`, so the completion check sees the updated statuses and can properly fail/complete the mission.
+
+**Alternatives Considered:**
+1. Increase the limit multiplier (e.g., `limit * 10`) — Band-aid. Would still fail with enough dead missions. Doesn't clean up zombies.
+2. Add a `mission.status = 'in_progress'` filter to the SQL query — Already exists (via `missions!inner(status)`), but missions 87 and 90 were still `in_progress` because nobody had marked them failed. The zombie steps kept the missions alive.
+3. Filter by mission creation date — Fragile. Legitimate old missions could be slow but valid.
+
+**Trade-offs:**
+- (+) Worker can always reach live mission steps regardless of dead mission count
+- (+) Zombie steps are cleaned up automatically — no manual intervention needed
+- (+) Failed missions cascade correctly: blocked steps fail → mission completes as failed → stalled project detector can re-plan
+- (+) Zero performance impact: pending step count is bounded by active missions × steps per mission
+- (-) Fetching all pending rows instead of 6 — negligible cost, rows are small (status + id)
+- (-) `failBlockedSteps` runs every heartbeat tick for every active mission — but exits early (0 cost) when no failed steps exist
+
+---
+
 ## D-042: Autonomous Delivery — Iterative Research + Budget-Aware Execution
 
 **Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier

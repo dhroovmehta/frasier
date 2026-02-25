@@ -386,8 +386,10 @@ async function getPendingSteps(limit = 5) {
     .eq('processed', false)
     .eq('missions.status', 'in_progress')
     .order('step_order', { ascending: true })
-    .order('created_at', { ascending: true })
-    .limit(limit * 2); // Fetch extra since some may be blocked
+    .order('created_at', { ascending: true });
+    // WHY no .limit(): ISS-028 — a small fetch window caused zombie steps from dead
+    // missions to exhaust the results, preventing live mission steps from being reached.
+    // We fetch all pending steps and filter in JS. The post-fetch loop already caps at `limit`.
 
   if (error) {
     console.error('[missions] Failed to get pending steps:', error.message);
@@ -741,6 +743,48 @@ function canTeamHandle(teamAgents, roleCategory) {
 }
 
 // ============================================================
+// STALLED MISSION CLEANUP (ISS-028)
+// ============================================================
+
+/**
+ * Auto-fail pending steps that are permanently blocked by a failed predecessor.
+ * WHY: When a step fails, all downstream steps (higher step_order) can never execute.
+ * Without cleanup, these zombie steps clog the getPendingSteps() queue and prevent
+ * live missions from being picked up by the worker. See ISS-028.
+ *
+ * @param {number} missionId - The mission to check
+ * @returns {number} Count of steps that were auto-failed
+ */
+async function failBlockedSteps(missionId) {
+  const { data: steps, error } = await supabase
+    .from('mission_steps')
+    .select('id, status, step_order')
+    .eq('mission_id', missionId);
+
+  if (error || !steps || steps.length === 0) return 0;
+
+  const failedSteps = steps.filter(s => s.status === 'failed');
+  if (failedSteps.length === 0) return 0;
+
+  // WHY step_order > (not >=): parallel steps at the same order as the failed step
+  // might still succeed independently. Only steps that DEPEND on the failed group
+  // (i.e., higher step_order) are permanently blocked.
+  const minFailedOrder = Math.min(...failedSteps.map(s => s.step_order));
+  const blockedSteps = steps.filter(
+    s => s.status === 'pending' && s.step_order > minFailedOrder
+  );
+
+  if (blockedSteps.length === 0) return 0;
+
+  for (const step of blockedSteps) {
+    await failStep(step.id, 'Auto-failed: predecessor step failed (ISS-028 cleanup)');
+  }
+
+  console.log(`[missions] Auto-failed ${blockedSteps.length} blocked step(s) in mission #${missionId}`);
+  return blockedSteps.length;
+}
+
+// ============================================================
 // MULTI-STEP MISSION HELPERS
 // ============================================================
 
@@ -1000,6 +1044,8 @@ module.exports = {
   // DAG dependency checking (v0.9.0)
   areAllDependenciesMet,
   getPredecessorOutputs,
+  // Stalled mission cleanup (ISS-028)
+  failBlockedSteps,
   EXPERTISE_MAP,
   ROLE_TITLES,
   ROLE_KEYWORDS
