@@ -4,6 +4,22 @@ Bugs, incidents, and fixes. Most recent first.
 
 ---
 
+## ISS-026: Decomposition creates infeasible tasks — agents can't meet acceptance criteria
+
+**Date:** Feb 24, 2026 | **Severity:** High | **Status:** Fixed (v0.10.0)
+
+**Symptom:** Projects yield incomplete results. Research tasks rejected by QA 3 times, hit revision cap, marked as failed. Example: "Mine 50 Reddit threads per niche" — agent scored 3.6/5 but couldn't meet acceptance criteria because it has no Reddit scraping capability.
+
+**Root Cause:** The decomposition engine (`buildDecompositionPrompt()` in `decomposition.js`) received only agent names and roles — no tools, no constraints, no limits. It planned tasks assuming capabilities agents don't have (web scraping, Google Trends API, marketplace browsing). Acceptance criteria were written for human-level web access, not agent-level tool access.
+
+**Fix:** Two changes: (1) Inject a structured capability manifest into the decomposition prompt listing each role's tools and explicit CANNOT constraints. (2) Add a feasibility validation gate (T1 LLM) that checks each step against capabilities before execution, with one re-decomposition on failure.
+
+**Decision:** D-041
+
+**Files:** `src/lib/capabilities.js` (new), `src/lib/decomposition.js` (modified), `tests/v09/decomposition-wiring.test.js` (updated mock)
+
+---
+
 ## ISS-025: Attachment-only Discord messages silently dropped
 
 **Date:** Feb 24, 2026 | **Severity:** Medium | **Status:** Fixed (v0.9.6)

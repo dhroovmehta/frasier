@@ -4,6 +4,38 @@ All architectural and design decisions, with context and trade-offs.
 
 ---
 
+## D-041: Capability-Aware Decomposition — Manifest + Feasibility Gate
+
+**Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier
+
+**Context:** Projects were yielding incomplete results because the decomposition engine created tasks with acceptance criteria that agents couldn't fulfill. Example: "Mine 50 Reddit threads per niche" when agents have Brave Search (4 queries/task, 8 page fetches) and no headless browser. QA correctly rejected the work, agents couldn't fix it, steps hit the 3-strike cap, missions failed.
+
+The root cause: the decomposition prompt only received agent names and roles — no awareness of tools, constraints, or limits. All capability information was injected at execution time, after the plan was already locked in.
+
+**Decision:** Two changes to the decomposition engine:
+
+1. **Capability Manifest** — A structured text block (`capabilities.js`) listing each role's tools, strengths, and explicit CANNOT constraints, plus global execution limits. Injected into the decomposition prompt alongside the agent roster.
+
+2. **Feasibility Validation Gate** — After decomposition, a cheap T1 LLM call reviews each step against the manifest. If infeasible steps found, one re-decomposition with specific issue feedback. Fail-open on errors.
+
+**Alternatives Considered:**
+1. Fix at QA level (make reviewers more lenient) — wrong fix. QA was correct, the plan was bad.
+2. Let agents push back during execution — too late; plan is committed, steps exist, resources allocated.
+3. Add a separate "planner agent" — over-engineering; same LLM with better context solves it.
+4. Hard-code capability checks (no LLM) — too rigid; can't evaluate creative task descriptions programmatically.
+
+**Trade-offs:**
+- (+) Solves the root cause at the planning layer, not downstream
+- (+) Minimal cost: ~500-800 extra prompt tokens + 1 cheap T1 call per project
+- (+) Fail-open: broken validation doesn't block execution
+- (+) Static manifest is easy to extend when new tools are added
+- (-) Manifest must be manually maintained when agent capabilities change
+- (-) LLM-based feasibility check is probabilistic, not deterministic
+
+**Research:** Based on industry patterns — CrewAI role-based matching, LangGraph plan-and-execute with replanning, Microsoft AutoGen ledger-based orchestration, ChatHTN hybrid LLM+symbolic verification, Anthropic's capability manifest pattern.
+
+---
+
 ## D-040: Discord Attachment Processing — Extension-First Filtering
 
 **Date:** Feb 24, 2026 | **Status:** Active | **Author:** Frasier

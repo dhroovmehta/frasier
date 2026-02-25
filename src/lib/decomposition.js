@@ -1,7 +1,11 @@
-// decomposition.js — Task Decomposition Engine (v0.9.2)
+// decomposition.js — Task Decomposition Engine (v0.10.0)
 // WHY: Frasier breaks full-project directives into parallel/sequential task DAGs.
 // A single directive becomes a structured plan with dependency management,
 // proactive hiring, and escalation handling — enabling autonomous execution.
+//
+// v0.10.0: Capability-aware decomposition. The planner now receives a full manifest
+// of what agents can and cannot do, preventing infeasible acceptance criteria.
+// A feasibility gate validates the plan before execution (max 1 re-decomposition).
 
 const supabase = require('./supabase');
 const models = require('./models');
@@ -11,6 +15,7 @@ const missions = require('./missions');
 const projects = require('./projects');
 const linear = require('./linear');
 const events = require('./events');
+const capabilities = require('./capabilities');
 
 // ============================================================
 // DECOMPOSE PROJECT
@@ -42,6 +47,8 @@ async function decomposeProject({ projectId, missionId, directive, frasierAgentI
     const approachHints = approachMemory.formatForPrompt(approaches);
 
     // 3. T2 LLM call — strategic work gets Sonnet-tier reasoning
+    // WHY buildDecompositionPrompt now includes capability manifest: agents were getting
+    // tasks they couldn't complete (e.g., "mine 50 Reddit threads" with no scraping tools).
     const userMessage = buildDecompositionPrompt(directive, roster, approachHints);
 
     const llmResult = await models.callLLM({
@@ -83,6 +90,61 @@ async function decomposeProject({ projectId, missionId, directive, frasierAgentI
     // 5. Validate dependency graph — reject cycles before persisting
     if (!fallback && plan.tasks.length > 1) {
       validateDependencyGraph(plan.tasks);
+    }
+
+    // 5b. Feasibility validation gate — check plan against agent capabilities
+    // WHY: Prevents infeasible tasks from entering execution. A cheap T1 LLM reviews
+    // each step against the capability manifest. If issues found, re-decompose once
+    // with the feedback. Skip for fallback plans (already degraded) and escalations.
+    if (!fallback && !plan.escalation_needed) {
+      const feasibility = await capabilities.validatePlanFeasibility(plan, frasierAgentId);
+
+      if (!feasibility.feasible) {
+        console.log(`[decomposition] Feasibility issues found (${feasibility.issues.length}), re-decomposing...`);
+
+        // Build feedback string from issues for the re-decomposition prompt
+        const feedbackText = feasibility.issues
+          .map(i => `- [${i.taskId}]: ${i.issue}\n  Suggestion: ${i.suggestion}`)
+          .join('\n');
+
+        // Re-decompose with feasibility feedback (max 1 retry)
+        const retryMessage = buildDecompositionPrompt(directive, roster, approachHints, feedbackText);
+
+        const retryResult = await models.callLLM({
+          systemPrompt: 'You are Frasier Crane, Chief of Staff at NERV. Decompose project directives into structured task plans. Respond with valid JSON only.',
+          userMessage: retryMessage,
+          agentId: frasierAgentId,
+          forceTier: 'tier2'
+        });
+
+        try {
+          let retryContent = retryResult.content.trim();
+          if (retryContent.startsWith('```')) {
+            retryContent = retryContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+          }
+          const retryPlan = JSON.parse(retryContent);
+
+          // Validate the revised plan's dependency graph
+          if (retryPlan.tasks && retryPlan.tasks.length > 1) {
+            validateDependencyGraph(retryPlan.tasks);
+          }
+
+          // Re-validate feasibility on the revised plan
+          const retryFeasibility = await capabilities.validatePlanFeasibility(retryPlan, frasierAgentId);
+
+          if (retryFeasibility.feasible) {
+            plan = retryPlan;
+            console.log('[decomposition] Re-decomposition passed feasibility check');
+          } else {
+            // Still infeasible after retry — proceed with best effort
+            plan = retryPlan;
+            console.log(`[decomposition] Re-decomposition still has ${retryFeasibility.issues.length} issues, proceeding with best plan`);
+          }
+        } catch (retryParseErr) {
+          // Re-decomposition JSON failed — keep original plan
+          console.log(`[decomposition] Re-decomposition parse failed, keeping original plan: ${retryParseErr.message}`);
+        }
+      }
     }
 
     // 6. Persist decomposition plan for audit trail + Linear sync
@@ -278,20 +340,42 @@ async function createStepsFromPlan(missionId, plan, agentMap) {
 // HELPERS
 // ============================================================
 
-function buildDecompositionPrompt(directive, roster, approachHints) {
+function buildDecompositionPrompt(directive, roster, approachHints, feasibilityFeedback) {
+  const capabilityManifest = capabilities.buildCapabilityManifest();
+
   let prompt = `Decompose this directive into a structured task plan:
 
 DIRECTIVE: ${directive}
 
 AVAILABLE AGENTS:
 ${roster || '(No agents currently active)'}
+
+${capabilityManifest}
 `;
 
   if (approachHints) {
     prompt += `\nAPPROACH HINTS FROM SIMILAR PAST WORK:\n${approachHints}\n`;
   }
 
+  // WHY: When re-decomposing after feasibility failure, inject the specific issues
+  // so the LLM knows exactly what to fix and how to adapt.
+  if (feasibilityFeedback) {
+    prompt += `\n## PREVIOUS PLAN REJECTED — FEASIBILITY ISSUES FOUND
+The previous decomposition included tasks that agents cannot accomplish with their available tools.
+Fix these issues by adapting the approach creatively — same goals, achievable methods:
+
+${feasibilityFeedback}
+`;
+  }
+
   prompt += `
+## CRITICAL PLANNING RULES
+- Every task MUST be achievable using ONLY the assigned role's listed tools and capabilities
+- Acceptance criteria MUST be realistic for the agent's tools — do not require capabilities they lack
+- If the directive requires capabilities no agent has, adapt the approach creatively: find alternative paths to the same outcome using available tools
+- Be inventive: "mine 50 Reddit threads" becomes "search for Reddit discussions via Brave Search and compile findings"
+- Never create tasks that assume web scraping, API access, or tools not listed in the manifest above
+
 Respond with JSON matching this schema:
 {
   "tasks": [

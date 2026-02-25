@@ -4,6 +4,30 @@ All notable changes to this project are documented here.
 
 ---
 
+## [0.10.0] — 2026-02-24 (Capability-Aware Decomposition)
+
+### Added
+- **Capability manifest** (`src/lib/capabilities.js`) — Structured definition of what each agent role can and cannot do (tools, strengths, constraints). Injected into the decomposition prompt so the planner creates achievable tasks.
+- **Feasibility validation gate** — After decomposition, a cheap T1 LLM call reviews each step against the capability manifest. Infeasible steps trigger one re-decomposition with specific feedback. Fail-open: if validation breaks, execution proceeds (QA pipeline is still a safety net).
+- **CRITICAL PLANNING RULES** in decomposition prompt — Explicit instructions to only create tasks achievable with listed tools, adapt creatively when direct methods are unavailable.
+- **`ROLE_CAPABILITIES` constant** — Structured data for 7 roles (research, engineering, content, strategy, marketing, qa, knowledge) with tools, strengths, and cannot arrays.
+- **`GLOBAL_CONSTRAINTS` constant** — System-wide limits (8 fetches/task, no headless browser, no auth, no file creation).
+- **Re-decomposition with feedback** — When feasibility check fails, the issues are injected into a retry prompt so the LLM knows exactly what to fix.
+- **TDD Tests:** 26 new tests in `tests/v010/capability-aware-decomposition.test.js` — 9 for capability manifest, 4 for prompt injection, 7 for feasibility validation, 6 for decomposition flow integration.
+
+### Modified
+- **`src/lib/decomposition.js`:** `buildDecompositionPrompt()` now includes capability manifest and feasibility instructions. `decomposeProject()` runs feasibility validation after parsing (skips for fallbacks and escalations). Max 1 re-decomposition on feasibility failure.
+- **`tests/v09/decomposition-wiring.test.js`:** Updated LLM mock to handle T1 feasibility calls alongside T2 decomposition calls.
+
+### Notes
+- All 488 tests pass (462 existing + 26 new, zero regressions).
+- 34 test suites.
+- Decision: D-041. Issue: ISS-026.
+- Zero new dependencies.
+- Cost: ~500-800 extra tokens in decomposition prompt + 1 cheap T1 validation call per project.
+
+---
+
 ## [0.9.6] — 2026-02-24 (Discord Attachment Support)
 
 ### Added

@@ -104,8 +104,22 @@ beforeEach(() => {
   mockSupabase.__reset();
   resetIdCounter();
 
-  // Default: LLM returns a valid 3-task decomposition plan
-  mockCallLLM.mockResolvedValue(buildLLMResponse());
+  // Default: LLM returns decomposition plan on T2 calls, feasibility pass on T1 calls.
+  // WHY: decomposeProject now runs a feasibility validation (T1) after the initial
+  // decomposition (T2). We route by forceTier so both calls get correct responses.
+  mockCallLLM.mockImplementation(async (opts) => {
+    if (opts.forceTier === 'tier1') {
+      // Feasibility check — return "all clear"
+      return {
+        content: JSON.stringify({ feasible: true, issues: [] }),
+        model: 'minimax', tier: 'tier1',
+        usage: { prompt_tokens: 500, completion_tokens: 200 },
+        error: null
+      };
+    }
+    // Decomposition call — return the plan
+    return buildLLMResponse();
+  });
 
   // Default: createMission succeeds and returns a mission object
   mockCreateMission.mockResolvedValue({
@@ -178,7 +192,8 @@ describe('handleNewProjectDecomposition', () => {
       frasierAgentId: 'frasier-001'
     });
 
-    expect(mockCallLLM).toHaveBeenCalledTimes(1);
+    // WHY 2 calls: decomposition (T2) + feasibility validation (T1)
+    expect(mockCallLLM).toHaveBeenCalledTimes(2);
     const callArgs = mockCallLLM.mock.calls[0][0];
     expect(callArgs.userMessage).toContain('Build a revolutionary test thing');
     expect(callArgs.agentId).toBe('frasier-001');

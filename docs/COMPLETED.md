@@ -1,6 +1,43 @@
 # Frasier — Completed Features
 
-> Last updated: Feb 24, 2026 (v0.9.4)
+> Last updated: Feb 24, 2026 (v0.10.0)
+
+---
+
+## Capability-Aware Decomposition (v0.10.0)
+
+### Capability Manifest
+- **File:** `src/lib/capabilities.js` (new)
+- `ROLE_CAPABILITIES` constant: structured data for 7 roles (research, engineering, content, strategy, marketing, qa, knowledge)
+- Each role defines: `tools` (what agents can use), `strengths` (what they're good at), `cannot` (explicit hard limits)
+- `GLOBAL_CONSTRAINTS` constant: system-wide limits (8 fetches/task, no headless browser, no auth, no file creation)
+- `buildCapabilityManifest()` formats all of the above into a text block for prompt injection
+
+### Decomposition Prompt Enhancement
+- **File:** `src/lib/decomposition.js` — `buildDecompositionPrompt()`
+- Capability manifest injected into the decomposition prompt alongside agent roster
+- New `CRITICAL PLANNING RULES` section instructs the LLM to:
+  - Only create tasks achievable with listed tools
+  - Set realistic acceptance criteria
+  - Adapt creatively when direct methods are unavailable (e.g., "mine Reddit threads" → "search for Reddit content via Brave")
+- Supports `feasibilityFeedback` parameter for re-decomposition prompts
+
+### Feasibility Validation Gate
+- **File:** `src/lib/capabilities.js` — `validatePlanFeasibility()`
+- Cheap T1 LLM call reviews each step against the capability manifest after decomposition
+- Returns `{ feasible, issues }` where each issue has `taskId`, `issue`, and `suggestion`
+- Fail-open: if validation breaks (bad JSON, LLM error), execution proceeds — QA pipeline is still a safety net
+- On failure: one re-decomposition with specific issue feedback injected into the prompt
+- After max retries: proceeds with best available plan (never blocks execution)
+- Skipped for: fallback single-task plans, escalated plans
+
+### Tests
+- 26 new tests in `tests/v010/capability-aware-decomposition.test.js`
+- 9 capability manifest tests (structure, content, constraints)
+- 4 prompt injection tests (manifest present, CANNOT constraints, feasibility instruction)
+- 7 feasibility validation tests (pass, fail, tier routing, fail-open, prompt content)
+- 6 flow integration tests (validation after decomp, re-decomp, retry feedback, max retries, skip conditions)
+- Total: 488 tests across 34 suites, zero regressions
 
 ---
 
